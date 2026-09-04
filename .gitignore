@@ -1,0 +1,20 @@
+# Python cache (temporary files you never need to track)
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment (too large, you can recreate it anytime)
+venv/
+.env/
+
+# Ollama model files (huge, downloaded separately)
+*.gguf
+*.bin
+*.safetensors
+
+# IDE settings (personal preference)
+.vscode/
+.idea/
+
+# Environment variables (contains sensitive data)
+.env
