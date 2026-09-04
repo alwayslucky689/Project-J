@@ -29,6 +29,7 @@ def ask_ollama(user_input):
     Available tools:
     - open_youtube: Opens Youtube. Takes an optional "search_query" string
     - open_spotify: Opens Spotify.
+    - no_tool: Use this when users request does not match any tool. Takes "message" explaining you don't understand.
     Examples:
     User: "Open YouTube and search for metal music"
     Assistant: {{"tool": "open_youtube", "search_query": "john peck"}}
