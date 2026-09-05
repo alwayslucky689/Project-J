@@ -19,3 +19,5 @@ venv/
 # Environment variables (contains sensitive data)
 .env
 settings.py
+config/settings.py
+config/settings
