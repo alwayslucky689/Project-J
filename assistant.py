@@ -8,19 +8,13 @@ import sys
 # Import your settings and modules
 from config import settings
 from config.personality_manager import PersonalityManager
-from tools import youtube,spotify,discord,ollama,ookla, personality_tools
-from memory.fact_memory import get_facts_context
+# Import all your actual tools
+from tools import youtube, spotify, discord, ollama, ookla, personality_tools
+from memory.fact_memory import get_facts_context, save_fact
 
 # 1. Initialize Personality Manager
 personality_mgr = PersonalityManager()
 personality_tools.init_personality_tools(personality_mgr)
-
-# 2. Import your existing tool functions
-# (Assuming you have functions like open_website, open_application, remember_fact etc.)
-# If they are in separate files, ensure they are imported.
-# Example: from tools.web_tools import open_website, search_web
-# from tools.app_tools import open_application
-# from tools.memory_tools import remember_fact
 
 # 3. Helper: Build the full system prompt with memory
 def build_system_prompt():
@@ -32,7 +26,7 @@ def build_system_prompt():
         return base_system.replace("{user_facts}", facts)
     return base_system.replace("{user_facts}", "")
 
-# 4. Core AI Interaction Functions
+# 4. Core AI Interaction Functions (Your existing ask_ollama remains the same)
 def ask_ollama(prompt_text, is_json=False):
     """
     Sends a prompt to Ollama and returns the response.
@@ -65,7 +59,7 @@ def ask_ollama(prompt_text, is_json=False):
     
     return ai_output
 
-# 5. Command Router
+# 5. Command Router (Updated to use your tools)
 def route_request(user_input):
     """
     Handles the user input: checks for wake word, then routes to command or question.
@@ -83,15 +77,12 @@ def route_request(user_input):
             return f"💬 {detected.capitalize()} personality active. How can I help?"
 
     # Step B: Determine if it's a command or question
-    # We can use a simple heuristic (presence of action words) or a cheap classifier.
-    # For simplicity, let's check if it looks like an action:
-    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change"]
+    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "clear", "list", "queue"]
     is_command = any(word in user_input.lower() for word in action_keywords)
     
     if is_command:
         # Get the command prompt for the current personality
         command_template = personality_mgr.get_prompt("command")
-        # The command prompt should have a {user_input} placeholder
         prompt = command_template.replace("{user_input}", user_input)
         
         # Add the system prompt context to guide the AI
@@ -103,21 +94,15 @@ def route_request(user_input):
         # Execute the tool(s)
         return execute_tool(decision)
     else:
-        # It's a question
-        question_template = personality_mgr.get_prompt("question")
-        prompt = question_template.replace("{user_input}", user_input)
-        system_context = build_system_prompt()
-        full_prompt = f"{system_context}\n\n{prompt}"
-        
-        return ask_ollama(full_prompt, is_json=False)
+        # It's a question - use your existing ollama.ask_question function
+        return ollama.ask_question(user_input)
 
-# 6. Tool Executor (Refactored to handle your existing tools)
+# 6. Tool Executor (CORRECTED - now maps to YOUR actual functions)
 def execute_tool(decision):
     """
     Executes the tool specified in the AI's JSON decision.
     Supports both single actions and lists of actions.
     """
-    # If it's a list, execute each one sequentially
     if isinstance(decision, list):
         results = []
         for action in decision:
@@ -129,27 +114,104 @@ def execute_tool(decision):
 def execute_single_action(action):
     tool_name = action.get("tool")
     
-    # Security check: Is this tool allowed?
-    if tool_name not in settings.ALLOWED_TOOLS:
-        return f"⚠️ Security Error: Tool '{tool_name}' is not in the allowed list."
+   
+    # Route to your ACTUAL functions
+    try:
+        if tool_name == "open_youtube":
+            # Call your youtube.open_youtube function
+            return youtube.open_youtube(action.get("search_query"))
+        
+        elif tool_name == "search_youtube":
+            results = youtube.search_youtube(action.get("query"), action.get("max_results", 5))
+            if results:
+                return f"✅ Found {len(results)} videos. You can say 'play video 1' to play the first one."
+            else:
+                return "❌ No videos found."
+        
+        elif tool_name == "play_youtube_video":
+            index = action.get("index", 1)
+            # Default to first video if index is not provided or invalid
+            if index is None:
+                index = 1
+            success = youtube.play_youtube_video(index)
+            return "▶️ Playing video" if success else "❌ Could not play video."
+        
+        elif tool_name == "open_spotify":
+            return spotify.open_spotify()
+        
+        elif tool_name == "play_spotify_song":
+            return spotify.play_spotify_song(action.get("song"), action.get("artist"))
+        
+        elif tool_name == "queue_spotify_song":
+            return spotify.queue_spotify_song(action.get("song"), action.get("artist"))
+        
+        elif tool_name == "play_spotify_playlist":
+            return spotify.play_spotify_playlist(action.get("playlist"))
+        
+        elif tool_name == "play_my_playlist":
+            return spotify.play_my_playlist(action.get("playlist"))
+        
+        elif tool_name == "list_playlists":
+            playlists = spotify.list_playlists()
+            return "📋 Listed playlists in the console."
+        
+        elif tool_name == "pause_spotify":
+            return spotify.pause_spotify()
+        
+        elif tool_name == "resume_spotify":
+            return spotify.resume_spotify()
+        
+        elif tool_name == "next_track":
+            return spotify.next_track()
+        
+        elif tool_name == "previous_track":
+            return spotify.previous_track()
+        
+        elif tool_name == "set_volume":
+            return spotify.set_volume(action.get("volume", 50))
+        
+        elif tool_name == "raise_volume":
+            return spotify.raise_volume(action.get("amount", 10))
+        
+        elif tool_name == "lower_volume":
+            return spotify.lower_volume(action.get("amount", 10))
+        
+        elif tool_name == "clear_queue":
+            return spotify.clear_queue()
+        
+        elif tool_name == "open_discord":
+            return discord.open_discord()
+        
+        elif tool_name == "run_speed_test":
+            # Use your ookla module
+            results = ookla.run_speed_test(background=action.get("background", True))
+            return ookla.get_formatted_results(results)
+        
+        elif tool_name == "quick_speed_test":
+            return ookla.quick_speed_test()
+        
+        elif tool_name == "save_fact":
+            fact = action.get("fact")
+            if fact:
+                return save_fact(fact)
+            else:
+                return "❌ No fact provided to remember."
+        
+        elif tool_name == "change_personality":
+            return personality_tools.change_personality(action.get("name"))
+        
+        elif tool_name == "ask_question":
+            # Use your ollama module to answer a question
+            return ollama.ask_question(action.get("question"))
+        
+        elif tool_name == "error":
+            return f"⚠️ AI Error: {action.get('message')}"
+        
+        else:
+            return f"⚠️ Unknown tool: {tool_name}. AI said: {action}"
     
-    # Route to the appropriate function
-    # Map tool names to actual functions (you'll need to import these)
-    # Example mapping:
-    if tool_name == "open_website":
-        return web_tools.open_website(action.get("url"))
-    elif tool_name == "search_web":
-        return web_tools.search_web(action.get("query"), action.get("engine", "google"))
-    elif tool_name == "open_application":
-        return app_tools.open_application(action.get("app_name"))
-    elif tool_name == "remember_fact":
-        return memory_tools.remember_fact(action.get("fact"))
-    elif tool_name == "change_personality":
-        return personality_tools.change_personality(action.get("name"))
-    elif tool_name == "error":
-        return f"⚠️ AI Error: {action.get('message')}"
-    else:
-        return f"⚠️ Unknown tool: {tool_name}. AI said: {action}"
+    except Exception as e:
+        return f"❌ Error executing {tool_name}: {str(e)}"
 
 # 7. The Main Loop
 def main():
