@@ -20,4 +20,5 @@ venv/
 .env
 settings.py
 config/settings.py
-config/settings
+data/
+!data/.gitkeep
