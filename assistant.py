@@ -6,6 +6,8 @@ import os
 import sys
 
 # Import your settings and modules
+# Import TTS manager
+from tts_manager import speak_async
 from config import settings
 from config.personality_manager import PersonalityManager
 # Import all your actual tools
@@ -229,6 +231,7 @@ def main():
         
         result = route_request(user_input)
         print(f"🤖 {result}")
-
+        if settings.ENABLE_TTS and result and isinstance(result, str):
+            speak_async(result)
 if __name__ == "__main__":
     main()
