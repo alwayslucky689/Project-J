@@ -10,7 +10,7 @@ from config import settings
 from config.personality_manager import PersonalityManager
 # Import all your actual tools
 from tools import youtube, spotify, discord, ollama, ookla, personality_tools
-from memory.fact_memory import get_facts_context, save_fact
+from memory.fact_memory import get_facts_context, save_fact 
 
 # 1. Initialize Personality Manager
 personality_mgr = PersonalityManager()
@@ -190,7 +190,7 @@ def execute_single_action(action):
         elif tool_name == "quick_speed_test":
             return ookla.quick_speed_test()
         
-        elif tool_name == "save_fact":
+        elif tool_name == "remember_fact":
             fact = action.get("fact")
             if fact:
                 return save_fact(fact)
