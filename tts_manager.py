@@ -4,20 +4,11 @@ import time
 import threading
 import subprocess
 import platform
-import numpy as np
-import soundfile as sf
 import torch
+import soundfile as sf
 from omnivoice import OmniVoice
 
 os.environ["HF_HOME"] = "C:\\Users\\pstef\\.cache\\huggingface"
-
-# Try to import sounddevice; if not available, fall back to file playback
-try:
-    import sounddevice as sd
-    HAS_SOUNDDEVICE = True
-except ImportError:
-    HAS_SOUNDDEVICE = False
-    print("⚠️ sounddevice not installed. Install with: pip install sounddevice")
 
 class TTSManager:
     _instance = None
@@ -34,18 +25,11 @@ class TTSManager:
         self._initialized = True
         self.model = None
         self.cache = {}
-        # Voice profile description
-        self.voice_profile = {
-            "name": "Jarvis",
-            "description": "A calm, British-accented male voice with crisp enunciation and subtle warmth.",
-            "speed": 1.0,
-            "sample_rate": 24000,
-            "traits": ["Professional", "Slightly humorous", "Reassuring"]
-        }
+        self.muted = False  # <- NEW: mute state
         self._load_model()
 
     def _load_model(self):
-        print("🎤 Loading TTS model on GPU...")
+        print("🎤 Loading TTS model on GPU (this may take a few seconds)...")
         try:
             self.model = OmniVoice.from_pretrained(
                 "k2-fsa/OmniVoice",
@@ -53,86 +37,96 @@ class TTSManager:
                 dtype=torch.float16,
                 local_files_only=True
             )
-            print(f"✅ TTS model loaded. Voice: {self.voice_profile['name']}")
-            print(f"   {self.voice_profile['description']}")
+            print("✅ TTS model loaded successfully.")
         except Exception as e:
             print(f"❌ Failed to load TTS model: {e}")
             self.model = None
 
-    def speak(self, text, voice=None, block=False, speed=None):
-        if not text or not self.model or len(text.strip()) < 10:
+    def set_mute(self, muted: bool):
+        """Set mute state: True = no speech output, False = speech enabled"""
+        self.muted = muted
+        state = "🔇 " if muted else "🔊 Voice output ENABLED"
+        print(f"TTS: {state}")
+
+    def toggle_mute(self):
+        """Toggle mute state on/off"""
+        self.set_mute(not self.muted)
+
+    def speak(self, text, voice=None, block=False):
+        """Generate speech ONLY if not muted"""
+        if not text or not self.model:
             return
 
-        # Check cache
+        # Skip very short messages
+        if len(text) < 5:
+            return
+
+        # If muted, skip TTS entirely
+        if self.muted:
+            print(f"Assistant: {text[:60]}...")
+            return
+
+        # Rest of your existing speak logic...
         if text in self.cache:
             audio = self.cache[text]
         else:
-            speed = speed or self.voice_profile["speed"]
+            start = time.time()
             try:
-                audio = self.model.generate(
-                    text=text,
-                    num_step=16,
-                    speed=speed,
-                )
+                audio = self.model.generate(text=text, num_step=16, speed=1.0)
                 self.cache[text] = audio
             except Exception as e:
                 print(f"❌ TTS generation error: {e}")
                 return
 
-        # Ensure audio is a numpy array
-        audio = np.asarray(audio, dtype=np.float32)
-        # If it's 2D with shape (samples, 1), squeeze to 1D
-        if audio.ndim == 2 and audio.shape[1] == 1:
-            audio = audio.squeeze(1)
-        elif audio.ndim > 1:
-            audio = audio.flatten()  # Fallback
+        temp_file = "tts_output.wav"
+        try:
+            sf.write(temp_file, audio[0], 24000)
+        except Exception as e:
+            print(f"❌ Failed to save audio: {e}")
+            return
 
         if block:
-            self._play_audio_blocking(audio)
+            self._play_audio_blocking(temp_file)
         else:
-            threading.Thread(target=self._play_audio_blocking, args=(audio,), daemon=True).start()
+            threading.Thread(target=self._play_audio_blocking, args=(temp_file,), daemon=True).start()
 
-    def _play_audio_blocking(self, audio):
-        """Play audio using sounddevice if available, otherwise fallback to file."""
-        if HAS_SOUNDDEVICE:
-            try:
-                # Play with correct parameters - no extra 'channels' argument
-                sd.play(audio, samplerate=self.voice_profile["sample_rate"])
-                sd.wait()  # Wait for playback to finish
-                return
-            except Exception as e:
-                print(f"❌ sounddevice playback error: {e}")
-                # Fall through to file fallback
-
-        # Fallback: save to WAV and play with system player
+    def _play_audio_blocking(self, filepath):
         try:
-            temp_file = "tts_output.wav"
-            sf.write(temp_file, audio, self.voice_profile["sample_rate"])
-            time.sleep(0.1)  # Ensure file is written
             system = platform.system()
             if system == "Windows":
-                subprocess.run(["start", temp_file], shell=True, check=False)
+                subprocess.run(["start", filepath], shell=True, check=False, capture_output=True)
             elif system == "Darwin":
-                subprocess.run(["open", temp_file], check=False)
+                subprocess.run(["open", filepath], check=False, capture_output=True)
             else:
-                subprocess.run(["xdg-open", temp_file], check=False)
+                subprocess.run(["xdg-open", filepath], check=False, capture_output=True)
         except Exception as e:
-            print(f"❌ Fallback playback error: {e}")
+            print(f"❌ Could not play audio: {e}")
 
-    def speak_async(self, text, voice=None, speed=None):
-        self.speak(text, voice=voice, block=False, speed=speed)
-
-    def get_voice_profile(self):
-        return self.voice_profile
+    def speak_async(self, text, voice=None):
+        self.speak(text, voice=voice, block=False)
 
 # Global instance
 _tts_instance = TTSManager()
 
-def speak(text, voice=None, block=False, speed=None):
-    _tts_instance.speak(text, voice=voice, block=block, speed=speed)
+def speak(text, voice=None, block=False):
+    _tts_instance.speak(text, voice=voice, block=block)
 
-def speak_async(text, voice=None, speed=None):
-    _tts_instance.speak_async(text, voice=voice, speed=speed)
+def speak_async(text, voice=None):
+    _tts_instance.speak_async(text, voice=voice)
 
-def get_voice_info():
-    return _tts_instance.get_voice_profile()
+# NEW: Public functions to control mute
+def mute_tts():
+    """Mute all TTS output"""
+    _tts_instance.set_mute(True)
+
+def unmute_tts():
+    """Unmute TTS output"""
+    _tts_instance.set_mute(False)
+
+def toggle_mute():
+    """Toggle mute state"""
+    _tts_instance.toggle_mute()
+
+def is_muted():
+    """Check if TTS is currently muted"""
+    return _tts_instance.muted

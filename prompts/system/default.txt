@@ -29,9 +29,27 @@ AVAILABLE TOOLS (you MUST use these exact names):
 - remember_fact: Stores a fact about the user. Takes "fact" (string).
 - change_personality: Switches AI personality. Takes "name" (string).
 - ask_question: Answers a question. Takes "question" (string).
-
+- mute_tts: Mutes voice output (text only). Takes no arguments.
+- unmute_tts: Enables voice output. Takes no arguments.
+- toggle_tts: Toggles voice output on/off. Takes no arguments.
 EXAMPLES OF CORRECT OUTPUT:
+User: "mute"
+Assistant: {"tool": "mute_tts"}
 
+User: "quiet"
+Assistant: {"tool": "mute_tts"}
+
+User: "voice off"
+Assistant: {"tool": "mute_tts"}
+
+User: "unmute"
+Assistant: {"tool": "unmute_tts"}
+
+User: "voice on"
+Assistant: {"tool": "unmute_tts"}
+
+User: "toggle voice"
+Assistant: {"tool": "toggle_tts"}
 User: "open youtube"
 Assistant: {"tool": "open_youtube"}
 
