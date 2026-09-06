@@ -2,7 +2,7 @@
 """
 Ollama/AI-related functions for the AI Assistant
 """
-
+from config import settings
 import requests
 import json
 import re
@@ -20,14 +20,14 @@ def ask_question(question):
     
     try:
         response = requests.post(
-            url="http://localhost:11434/api/generate",
-            json={
-                "model": "llama3.1:8b-instruct-q4_K_M",
-                "prompt": question_prompt,
-                "stream": False,
-                "temperature": 0.7
-            },
-            timeout=30
+        url="http://localhost:11434/api/generate",
+        json={
+            "model": settings.REASONING_MODEL,  # Use reasoning model
+            "prompt": question_prompt,
+            "stream": False,
+            "temperature": 0.7
+        },
+        timeout=30
         )
         
         if response.status_code == 200:

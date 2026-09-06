@@ -1,10 +1,9 @@
 # assistant.py
-
+import re
 import json
 import requests
 import os
 import sys
-
 # Import your settings and modules
 # Import TTS manager
 from tts_manager import speak_async
@@ -29,54 +28,67 @@ def build_system_prompt():
     return base_system.replace("{user_facts}", "")
 
 # 4. Core AI Interaction Functions (Your existing ask_ollama remains the same)
-def ask_ollama(prompt_text, is_json=False):
-    """
-    Sends a prompt to Ollama and returns the response.
-    If is_json is True, it attempts to parse the response as JSON.
-    """
+def ask_ollama(prompt_text, is_json=False, model=None):
+    model = model or settings.FAST_MODEL
     full_prompt = prompt_text
     if is_json:
-        # Ensure the model knows to output JSON
-        full_prompt = f"{full_prompt}\n\nYou MUST respond with ONLY valid JSON. Do not include any other text."
+        try:
+            # Extract the first JSON object using regex
+            json_match = re.search(r'\{.*\}', ai_output, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            else:
+                return {"tool": "error", "message": f"No JSON found in: {ai_output}"}
+        except json.JSONDecodeError:
+            return {"tool": "error", "message": f"Invalid JSON: {ai_output}"}
 
     response = requests.post(
-        url=settings.OLLAMA_URL,  # From your settings.py
+        url=settings.OLLAMA_URL,
         json={
-            "model": settings.OLLAMA_MODEL,
+            "model": model,
             "prompt": full_prompt,
             "stream": False
         }
     )
-    
     if response.status_code != 200:
         return {"error": f"Ollama error: {response.status_code}"}
-    
     ai_output = response.json().get("response", "").strip()
-    
     if is_json:
         try:
-            return json.loads(ai_output)
+            # Extract first JSON object
+            json_match = re.search(r'\{.*\}', ai_output, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            else:
+                return {"tool": "error", "message": f"No JSON found in: {ai_output}"}
         except json.JSONDecodeError:
             return {"tool": "error", "message": f"Invalid JSON: {ai_output}"}
-    
     return ai_output
-
 # 5. Command Router (Updated to use your tools)
 def route_request(user_input):
-    """
-    Handles the user input: checks for wake word, then routes to command or question.
-    Returns a string (for questions) or executes the tool (for commands).
-    """
-    # Step A: Check for personality switch (wake word)
     detected = personality_mgr.detect_personality(user_input)
     if detected and personality_mgr.switch_to(detected):
-        # Remove the wake word from the input
         for word in personality_mgr.get_wake_words(detected):
             user_input = user_input.lower().replace(word.lower(), "").strip()
         print(f"🧠 Switched personality to: {detected}")
-        # If only the wake word was said, return.
         if not user_input:
             return f"💬 {detected.capitalize()} personality active. How can I help?"
+
+    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "clear", "list", "queue"]
+    is_command = any(word in user_input.lower() for word in action_keywords)
+    system_context = build_system_prompt()
+
+    if is_command:
+        command_template = personality_mgr.get_prompt("command")
+        prompt = command_template.replace("{user_input}", user_input)
+        full_prompt = f"{system_context}\n\n{prompt}"
+        decision = ask_ollama(full_prompt, is_json=True, model=settings.FAST_MODEL)
+        return execute_tool(decision)
+    else:
+        question_template = personality_mgr.get_prompt("question")
+        prompt = question_template.replace("{user_input}", user_input)
+        full_prompt = f"{system_context}\n\n{prompt}"
+        return ask_ollama(full_prompt, is_json=False, model=settings.REASONING_MODEL)
 
     # Step B: Determine if it's a command or question
     action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "clear", "list", "queue"]
@@ -84,6 +96,7 @@ def route_request(user_input):
     
     if is_command:
         # Get the command prompt for the current personality
+        model_to_use = settings.FAST_MODEL
         command_template = personality_mgr.get_prompt("command")
         prompt = command_template.replace("{user_input}", user_input)
         
@@ -97,7 +110,12 @@ def route_request(user_input):
         return execute_tool(decision)
     else:
         # It's a question - use your existing ollama.ask_question function
-        return ollama.ask_question(user_input)
+        model_to_use = settings.REASONING_MODEL
+        system_context = build_system_prompt()
+        question_template = personality_mgr.get_prompt("question")
+        prompt = question_template.replace("{user_input}", user_input)
+        full_prompt = f"{system_context}\n\n{prompt}"
+        return ask_ollama(full_prompt, is_json=False, model=settings.REASONING_MODEL)
 
 # 6. Tool Executor (CORRECTED - now maps to YOUR actual functions)
 def execute_tool(decision):
