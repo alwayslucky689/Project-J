@@ -134,7 +134,10 @@ def route_request(user_input):
             user_input = user_input.lower().replace(word.lower(), "").strip()
         print(f"🧠 Switched personality to: {detected}")
         if not user_input:
-            return f"💬 {detected.capitalize()} personality active. How can I help?"
+            response = f"💬 {detected.capitalize()} personality active. How can I help?"
+            if settings.ENABLE_TTS:
+                speak_async(response)
+            return {"response": response, "was_streamed": False}
     
     # Step 1: Check if it's a question
     question_keywords = ["what", "why", "how", "when", "where", "who", "which", 
@@ -149,8 +152,9 @@ Be concise but helpful. Don't mention that you're an AI.
 User: {user_input}
 Assistant:"""
         response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
-        # Return None to indicate streaming already printed
-        return None
+        if settings.ENABLE_TTS and response:
+            speak_async(response)
+        return {"response": response, "was_streamed": True}  # Already printed
     
     # Step 2: Check for command keywords
     action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "clear", "list", "queue"]
@@ -164,8 +168,7 @@ Assistant:"""
         
         decision = ask_ollama(full_prompt, is_json=True, model=settings.FAST_MODEL)
         result = execute_tool(decision)
-        # Return the result as a string
-        return result if result is not None else ""
+        return {"response": result, "was_streamed": False}  # Not printed yet
     
     # Step 3: Default natural conversation
     default_prompt = f"""The user said: {user_input}. Respond naturally and helpfully.
@@ -173,7 +176,9 @@ If they're asking for something, answer directly. If it's a command, tell them c
 
 Your response (natural language):"""
     response = ask_ollama_streaming(default_prompt, model=settings.REASONING_MODEL)
-    return None
+    if settings.ENABLE_TTS and response:
+        speak_async(response)
+    return {"response": response, "was_streamed": True}
 
 # 6. Tool Executor
 def execute_tool(decision):
@@ -304,7 +309,7 @@ def main():
         
         # Only print if result is a non-empty string
         if result is not None and isinstance(result, str) and result.strip():
-            print(f"🤖 {result}")
+           # print(f"🤖 {result}")
             if settings.ENABLE_TTS:
                 speak_async(result)
 
