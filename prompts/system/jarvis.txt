@@ -38,6 +38,9 @@ AVAILABLE TOOLS (you MUST use these exact names):
 - queue_spotify_song: Queues a song. Takes "song" (string) and optional "artist" (string).
 - play_spotify_playlist: Plays a playlist. Takes "playlist" (string).
 - play_my_playlist: Plays a playlist from your library. Takes "playlist" (string).
+- set_tts_volume: Sets TTS volume (0-100). Takes "volume" (integer).
+- raise_tts_volume: Raises TTS volume. Takes optional "amount" (integer, default 10).
+- lower_tts_volume: Lowers TTS volume. Takes optional "amount" (integer, default 10).
 - list_playlists: Lists your playlists. Takes no arguments.
 - pause_spotify: Pauses playback. Takes no arguments.
 - resume_spotify: Resumes playback. Takes no arguments.
@@ -59,7 +62,14 @@ AVAILABLE TOOLS (you MUST use these exact names):
 EXAMPLES OF CORRECT OUTPUT:
 User: "mute"
 Assistant: {"tool": "mute_tts"}
+User: "set tts volume to 50"
+Assistant: {"tool": "set_tts_volume", "volume": 50}
 
+User: "turn up tts volume"
+Assistant: {"tool": "raise_tts_volume", "amount": 10}
+
+User: "lower tts volume"
+Assistant: {"tool": "lower_tts_volume", "amount": 10}
 User: "quiet"
 Assistant: {"tool": "mute_tts"}
 

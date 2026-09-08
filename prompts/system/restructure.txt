@@ -1,0 +1,3 @@
+restructure to contain personalities and commands in one file 
+then just pick and choose from that file?
+cleaner

@@ -1,5 +1,4 @@
-# tts_manager.py - Fixed version
-
+# tts_manager.py - Complete fixed version
 import os
 import time
 import threading
@@ -9,13 +8,14 @@ import torch
 import soundfile as sf
 import numpy as np
 from omnivoice import OmniVoice
+from omnivoice import VoiceClonePrompt
 
 try:
-    import sounddevice as sd
-    HAS_SOUNDDEVICE = True
+    import pygame
+    HAS_PYGAME = True
 except ImportError:
-    HAS_SOUNDDEVICE = False
-    print("⚠️ sounddevice not installed. Install with: pip install sounddevice")
+    HAS_PYGAME = False
+    print("⚠️ pygame-ce not installed. Install with: pip install pygame-ce")
 
 os.environ["HF_HOME"] = "C:\\Users\\pstef\\.cache\\huggingface"
 
@@ -36,7 +36,18 @@ class TTSManager:
         self.cache = {}
         self.muted = False
         self.sample_rate = 24000
+        self.volume = 0.8  # Default volume
+        self.voice_prompt = None
         self._load_model()
+        self._load_voice_prompt()
+        
+        # Initialize pygame mixer with STEREO
+        if HAS_PYGAME:
+            try:
+                pygame.mixer.init(frequency=self.sample_rate, size=-16, channels=2)
+                print("🔊 Pygame-ce mixer initialized (stereo).")
+            except Exception as e:
+                print(f"⚠️ Could not initialize pygame mixer: {e}")
 
     def _load_model(self):
         print("🎤 Loading TTS model on GPU (this may take a few seconds)...")
@@ -48,13 +59,39 @@ class TTSManager:
                 local_files_only=True
             )
             print("✅ TTS model loaded successfully.")
-            if HAS_SOUNDDEVICE:
-                print("🔊 Using sounddevice for playback.")
-            else:
-                print("⚠️ sounddevice not available. Using file playback fallback.")
         except Exception as e:
             print(f"❌ Failed to load TTS model: {e}")
             self.model = None
+
+    def _load_voice_prompt(self):
+        prompt_path = "prompts/system/jarvis_voice.pt"
+        
+        if os.path.exists(prompt_path):
+            try:
+                self.voice_prompt = VoiceClonePrompt.load(prompt_path)
+                return
+            except:
+                self.voice_prompt = None
+                return
+        
+        ref_audio_path = "prompts/system/jarvis_sample.wav"
+        if os.path.exists(ref_audio_path) and self.model is not None:
+            try:
+                self.voice_prompt = self.model.create_voice_clone_prompt(
+                    ref_audio=ref_audio_path,
+                    ref_text="Your actual transcription here."
+                )
+                self.voice_prompt.save(prompt_path)
+            except:
+                self.voice_prompt = None
+
+    def set_volume(self, volume):
+        """Set volume level (0.0 to 1.0)"""
+        self.volume = max(0.0, min(1.0, volume))
+        print(f"🔊 TTS volume set to {int(self.volume * 100)}%")
+
+    def get_volume(self):
+        return self.volume
 
     def set_mute(self, muted: bool):
         self.muted = muted
@@ -65,6 +102,7 @@ class TTSManager:
         self.set_mute(not self.muted)
 
     def speak(self, text, voice=None, block=False):
+        """Generate and play speech"""
         if not text or not self.model:
             return
         if len(text) < 5:
@@ -78,12 +116,20 @@ class TTSManager:
             audio = self.cache[text]
         else:
             try:
-                # Generate audio with explicit parameters
-                audio = self.model.generate(
-                    text=text,
-                    num_step=32,  # More steps = better quality (default is 32)
-                    speed=1.0,
-                )
+                if self.voice_prompt:
+                    audio = self.model.generate(
+                        text=text,
+                        num_step=32,
+                        speed=1.0,
+                        voice_clone_prompt=self.voice_prompt,
+                    )
+                else:
+                    audio = self.model.generate(
+                        text=text,
+                        num_step=32,
+                        speed=1.0,
+                        instruct="male, british accent, medium pitch",
+                    )
                 self.cache[text] = audio
             except Exception as e:
                 print(f"❌ TTS generation error: {e}")
@@ -95,45 +141,42 @@ class TTSManager:
         if audio.ndim > 1:
             audio = audio.flatten()
         
-        # Normalize to float32 range (-1 to 1)
+        # Normalize
         audio = audio.astype(np.float32)
         max_val = np.max(np.abs(audio))
         if max_val > 0:
             audio = audio / max_val
-        
-        # Trim silence from ends (optional)
-        # audio = self._trim_silence(audio)
 
         if block:
             self._play_audio(audio)
         else:
             threading.Thread(target=self._play_audio, args=(audio,), daemon=True).start()
 
-    def _trim_silence(self, audio, threshold=0.02):
-        """Trim leading/trailing silence"""
-        mask = np.abs(audio) > threshold
-        if not np.any(mask):
-            return audio
-        start = np.argmax(mask)
-        end = len(mask) - np.argmax(mask[::-1])
-        return audio[start:end]
-
     def _play_audio(self, audio):
+        """Play audio using pygame-ce"""
         try:
-            # Always use sounddevice if available
-            if HAS_SOUNDDEVICE:
+            # Apply volume
+            scaled_audio = audio * self.volume
+            
+            if HAS_PYGAME:
                 try:
-                    # Play with explicit parameters
-                    sd.play(audio, self.sample_rate)
-                    sd.wait()
+                    # Convert to int16
+                    audio_int16 = (scaled_audio * 32767).astype(np.int16)
+                    # Convert mono to stereo if needed
+                    if audio_int16.ndim == 1:
+                        audio_int16 = np.column_stack((audio_int16, audio_int16))
+                    sound = pygame.sndarray.make_sound(audio_int16)
+                    sound.play()
+                    while pygame.mixer.get_busy():
+                        pygame.time.wait(10)
                     return
                 except Exception as e:
-                    print(f"❌ sounddevice playback error: {e}")
+                    print(f"❌ Pygame playback error: {e}")
                     # Fall through to file fallback
             
             # Fallback: Save to WAV and play
             temp_file = "tts_output.wav"
-            sf.write(temp_file, audio, self.sample_rate)
+            sf.write(temp_file, scaled_audio, self.sample_rate)
             time.sleep(0.1)
             
             system = platform.system()
@@ -147,11 +190,13 @@ class TTSManager:
             print(f"❌ Playback error: {e}")
 
     def speak_async(self, text, voice=None):
+        """Non-blocking speech"""
         self.speak(text, voice=voice, block=False)
 
 # Global instance
 _tts_instance = TTSManager()
 
+# Public functions
 def speak(text, voice=None, block=False):
     _tts_instance.speak(text, voice=voice, block=block)
 
@@ -169,3 +214,9 @@ def toggle_mute():
 
 def is_muted():
     return _tts_instance.muted
+
+def set_tts_volume(volume):
+    _tts_instance.set_volume(volume / 100)
+
+def get_tts_volume():
+    return int(_tts_instance.get_volume() * 100)

@@ -32,6 +32,9 @@ AVAILABLE TOOLS (you MUST use these exact names):
 - ask_question: Answers a question. Takes "question" (string).
 - mute_tts: Mutes voice output (text only). Takes no arguments.
 - unmute_tts: Enables voice output. Takes no arguments.
+- set_tts_volume: Sets TTS volume (0-100). Takes "volume" (integer).
+- raise_tts_volume: Raises TTS volume. Takes optional "amount" (integer, default 10).
+- lower_tts_volume: Lowers TTS volume. Takes optional "amount" (integer, default 10).
 - toggle_tts: Toggles voice output on/off. Takes no arguments.
 EXAMPLES OF CORRECT OUTPUT:
 User: "mute"
@@ -45,7 +48,14 @@ Assistant: {"tool": "mute_tts"}
 
 User: "unmute"
 Assistant: {"tool": "unmute_tts"}
+User: "set tts volume to 50"
+Assistant: {"tool": "set_tts_volume", "volume": 50}
 
+User: "turn up tts volume"
+Assistant: {"tool": "raise_tts_volume", "amount": 10}
+
+User: "lower tts volume"
+Assistant: {"tool": "lower_tts_volume", "amount": 10}
 User: "voice on"
 Assistant: {"tool": "unmute_tts"}
 

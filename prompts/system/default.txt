@@ -19,6 +19,9 @@ AVAILABLE TOOLS (you MUST use these exact names):
 - resume_spotify: Resumes playback. Takes no arguments.
 - next_track: Skips to next track. Takes no arguments.
 - previous_track: Goes to previous track. Takes no arguments.
+- set_tts_volume: Sets TTS volume (0-100). Takes "volume" (integer).
+- raise_tts_volume: Raises TTS volume. Takes optional "amount" (integer, default 10).
+- lower_tts_volume: Lowers TTS volume. Takes optional "amount" (integer, default 10).
 - set_volume: Sets volume. Takes "volume" (integer 0-100).
 - raise_volume: Raises volume. Takes optional "amount" (integer, default 10).
 - lower_volume: Lowers volume. Takes optional "amount" (integer, default 10).
@@ -52,7 +55,14 @@ User: "toggle voice"
 Assistant: {"tool": "toggle_tts"}
 User: "open youtube"
 Assistant: {"tool": "open_youtube"}
+User: "set tts volume to 50"
+Assistant: {"tool": "set_tts_volume", "volume": 50}
 
+User: "turn up tts volume"
+Assistant: {"tool": "raise_tts_volume", "amount": 10}
+
+User: "lower tts volume"
+Assistant: {"tool": "lower_tts_volume", "amount": 10}
 User: "search youtube for cats"
 Assistant: {"tool": "search_youtube", "query": "cats", "max_results": 5}
 

@@ -157,7 +157,7 @@ Assistant:"""
         return {"response": response, "was_streamed": True}  # Already printed
     
     # Step 2: Check for command keywords
-    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "clear", "list", "queue"]
+    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute","set","lower","raise" "clear", "list", "queue"]
     is_command = any(word in user_input.lower() for word in action_keywords)
     
     if is_command:
@@ -274,6 +274,27 @@ def execute_single_action(action):
             toggle_mute()
             current = "muted" if is_muted() else "enabled"
             return f"🔊 Voice output {current}."
+        elif tool_name == "set_tts_volume":
+            from tts_manager import set_tts_volume
+            volume = action.get("volume", 70)
+            set_tts_volume(volume)
+            return f"🔊 TTS volume set to {volume}%"
+
+        elif tool_name == "raise_tts_volume":
+            from tts_manager import get_tts_volume, set_tts_volume
+            amount = action.get("amount", 10)
+            current = get_tts_volume()
+            new_vol = min(100, current + amount)
+            set_tts_volume(new_vol)
+            return f"🔊 TTS volume increased to {new_vol}%"
+
+        elif tool_name == "lower_tts_volume":
+            from tts_manager import get_tts_volume, set_tts_volume
+            amount = action.get("amount", 10)
+            current = get_tts_volume()
+            new_vol = max(0, current - amount)
+            set_tts_volume(new_vol)
+            return f"🔊 TTS volume decreased to {new_vol}%"
         elif tool_name == "remember_fact":
             fact = action.get("fact")
             if fact:
