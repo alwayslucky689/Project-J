@@ -6,7 +6,7 @@ __pycache__/
 # Virtual environment (too large, you can recreate it anytime)
 venv/
 .env/
-
+openWakeWord/
 # Ollama model files (huge, downloaded separately)
 *.gguf
 *.bin

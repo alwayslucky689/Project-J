@@ -1,3 +1,16 @@
 restructure to contain personalities and commands in one file 
 then just pick and choose from that file?
-cleaner
+and for the personality to actually dictate his reply not the text in assistant
+have to fix or change the tts cause it stutters too much
+see what llama.cpp is and if its better
+find out how to make the models have uptodate information instead of being years behind
+refactor to be able to support pc and mobile architecture
+refactor to not have so many elifs
+add functionality for a stronger model for strong thinking like a qwen 35b or 27b
+maybe layer offloading on ram or splitting the load between my pc and laptop
+llmfit to see if it Runs
+add memory
+maybe implement in c or c++ for faster 
+c++ in android
+add google maps functionality with directions/bus
+add travana next bus check
