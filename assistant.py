@@ -1,4 +1,4 @@
-# assistant.py - Complete fixed version
+# assistant.py - Complete version with wake word detection
 
 import re
 import subprocess
@@ -6,11 +6,14 @@ import json
 import requests
 import os
 import shutil
+import threading
+import time
 from tts_manager import speak_async
 from config import settings
 from config.personality_manager import PersonalityManager
 from tools import youtube, spotify, discord, ollama, ookla, personality_tools
 from memory.fact_memory import get_facts_context, save_fact
+from wakeword_detector import start_wake_detection, stop_wake_detection
 
 # Find ollama.exe
 def get_ollama_path():
@@ -31,6 +34,10 @@ if not OLLAMA_EXE:
 # 1. Initialize Personality Manager
 personality_mgr = PersonalityManager()
 personality_tools.init_personality_tools(personality_mgr)
+
+# Global state for wake word (prevents overlapping triggers)
+_is_wake_mode = False
+_wake_lock = threading.Lock()
 
 # 2. Helper: Build the full system prompt with memory
 def build_system_prompt():
@@ -157,7 +164,7 @@ Assistant:"""
         return {"response": response, "was_streamed": True}  # Already printed
     
     # Step 2: Check for command keywords
-    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute","set","lower","raise" "clear", "list", "queue"]
+    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "set", "lower", "raise", "clear", "list", "queue"]
     is_command = any(word in user_input.lower() for word in action_keywords)
     
     if is_command:
@@ -279,7 +286,6 @@ def execute_single_action(action):
             volume = action.get("volume", 70)
             set_tts_volume(volume)
             return f"🔊 TTS volume set to {volume}%"
-
         elif tool_name == "raise_tts_volume":
             from tts_manager import get_tts_volume, set_tts_volume
             amount = action.get("amount", 10)
@@ -287,7 +293,6 @@ def execute_single_action(action):
             new_vol = min(100, current + amount)
             set_tts_volume(new_vol)
             return f"🔊 TTS volume increased to {new_vol}%"
-
         elif tool_name == "lower_tts_volume":
             from tts_manager import get_tts_volume, set_tts_volume
             amount = action.get("amount", 10)
@@ -312,27 +317,124 @@ def execute_single_action(action):
     except Exception as e:
         return f"❌ Error executing {tool_name}: {str(e)}"
 
-# 7. The Main Loop
-def main():
-    print("🤖 Project-J AI Assistant Ready!")
-    print(f"Current personality: {personality_mgr.get_current_name()}")
-    print(f"Wake words: {personality_mgr.get_wake_words()}")
-    print("Type 'quit' to exit.")
-    print("-" * 40)
+# ==========================================
+# 7. Wake Word Callback
+# ==========================================
+
+def on_wake_word(confidence):
+    """
+    Called when the wake word is detected.
+    For now, prompts for text input.
+    Later this will be replaced with STT.
+    """
+    global _is_wake_mode
     
-    while True:
-        user_input = input("\n🎤 You: ")
+    with _wake_lock:
+        if _is_wake_mode:
+            return  # Already processing
+        _is_wake_mode = True
+    
+    try:
+        print(f"\n🎤 Assistant is now listening... (confidence: {confidence:.2f})")
+        
+        # Optional: play a subtle chime
+        try:
+            import winsound
+            winsound.Beep(800, 150)
+        except:
+            pass
+        
+        # TODO: Replace this with STT
+        print("📢 Speak your command (type it for now)...")
+        user_input = input("🎤 You: ")
+        
         if user_input.lower() in ["quit", "exit", "bye"]:
             print("👋 Goodbye!")
-            break
+            return
         
+        # Process through existing router
         result = route_request(user_input)
         
-        # Only print if result is a non-empty string
-        if result is not None and isinstance(result, str) and result.strip():
-           # print(f"🤖 {result}")
-            if settings.ENABLE_TTS:
-                speak_async(result)
+        # Handle response
+        if result and isinstance(result, dict):
+            response_text = result.get("response", "")
+            if not result.get("was_streamed", False) and response_text:
+                print(f"🤖 {response_text}")
+            if settings.ENABLE_TTS and response_text:
+                speak_async(response_text)
+                
+    except Exception as e:
+        print(f"❌ Error processing voice command: {e}")
+    finally:
+        with _wake_lock:
+            _is_wake_mode = False
+        print("🎤 Listening for wake word again...")
+
+# ==========================================
+# 8. The Main Loop
+# ==========================================
+
+def main():
+    print("=" * 60)
+    print("🤖 Project-J AI Assistant Ready!")
+    print("=" * 60)
+    print(f"📋 Current personality: {personality_mgr.get_current_name()}")
+    print(f"🔊 Wake words: {personality_mgr.get_wake_words()}")
+    print("💡 Type 'quit' to exit.")
+    print("🎤 Say 'Jarvis' or 'Hey Jarvis' to wake me up!")
+    print("📝 You can also type commands directly.")
+    print("-" * 60)
+    
+    # Start wake word detection
+    try:
+        model_path = "models/wakeword/jarvis_robust_final/jarvis_robust.onnx"
+        
+        if os.path.exists(model_path):
+            print(f"🔊 Loading wake word model from: {model_path}")
+            start_wake_detection(
+                callback=on_wake_word,
+                model_path=model_path,
+                threshold=0.4
+            )
+        else:
+            print(f"⚠️ Model not found at: {model_path}")
+            print("💡 Continuing with text input only.")
+    except Exception as e:
+        print(f"⚠️ Wake word detection failed to start: {e}")
+        print("💡 Continuing with text input only.")
+    
+    print("\n💬 Type your commands or say 'Jarvis' to wake me up!\n")
+    
+    # Text input loop (fallback)
+    while True:
+        try:
+            user_input = input("⌨️ You: ")
+            if user_input.lower() in ["quit", "exit", "bye"]:
+                break
+            
+            result = route_request(user_input)
+            
+            if result is not None:
+                if isinstance(result, dict):
+                    response_text = result.get("response", "")
+                    if not result.get("was_streamed", False) and response_text:
+                        print(f"🤖 {response_text}")
+                elif isinstance(result, str) and result.strip():
+                    print(f"🤖 {result}")
+                
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
+            break
+        except Exception as e:
+            print(f"❌ Error: {e}")
+    
+    # Cleanup
+    try:
+        stop_wake_detection()
+    except:
+        pass
+    
+    print("👋 Goodbye!")
 
 if __name__ == "__main__":
     main()

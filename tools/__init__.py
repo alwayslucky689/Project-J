@@ -9,7 +9,7 @@ from tools import spotify
 from tools import discord
 from tools import ollama
 from tools import ookla
-
+import pygame
 __all__ = [
     'open_spotify',
     'remember',
@@ -32,3 +32,6 @@ __all__ = [
     'get_current_track',
     'clear_queue'
 ]
+#self.volume = 0.8  # Default 80%
+#self.volume = 0.8  # Default volume (0.0 to 1.0)
+#pygame.mixer.init(frequency=self.sample_rate, size=-16, channels=1)
