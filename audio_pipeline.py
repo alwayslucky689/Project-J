@@ -27,17 +27,17 @@ CHUNK_SIZE = int(SAMPLE_RATE * CHUNK_MS / 1000)  # 2560 samples
 
 # Wake word
 WAKEWORD_MODEL = "models/wakeword/jarvis_robust_final/jarvis_robust.onnx"
-WAKEWORD_THRESHOLD = 0.4
+WAKEWORD_THRESHOLD = 0.3
 
 # VAD
 VAD_MODEL = "precise"
 VAD_MODE = "gradual"
-VAD_THRESHOLD = 0.55
+VAD_THRESHOLD = 0.6
 VAD_MIN_SILENCE_CHUNKS = 2   # 480ms silence ends a segment
-VAD_MIN_SPEECH_CHUNKS = 1    # at least 160ms of speech
+VAD_MIN_SPEECH_CHUNKS = 2   
 
 # Follow-up
-FOLLOWUP_SILENCE_SECONDS = 5.0
+FOLLOWUP_SILENCE_SECONDS = 4.0
 MAX_LISTEN_SECONDS = 15.0
 
 # Temp file

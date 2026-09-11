@@ -2,7 +2,7 @@
 """
 Tools package for the AI Assistant
 """
-import tts_manager
+from tts import tts_manager
 from tools import history
 from tools import youtube
 from tools import spotify

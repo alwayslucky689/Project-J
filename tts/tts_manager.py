@@ -2,6 +2,7 @@
 
 import os
 import time
+import unicodedata
 import threading
 import subprocess
 import platform
@@ -99,7 +100,43 @@ class TTSManager:
 
     def toggle_mute(self):
         self.set_mute(not self.muted)
+    # ============ Streaming helpers ============
 
+    def generate_chunk(self, text):
+        """
+        Synthesize text and return the raw audio array. No playback.
+
+        Used by StreamingTTS. Normalization matches _play_audio's
+        convention so consecutive chunks sound consistent.
+        """
+        if not text or not self.model or self.muted:
+            return None
+
+        audio = self._generate_audio(text)
+        if audio is None:
+            return None
+
+        # Same normalization as speak() uses
+        if isinstance(audio, list):
+            audio = np.array(audio)
+        if audio.ndim > 1:
+            audio = audio.flatten()
+
+        audio = audio.astype(np.float32)
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val
+
+        return audio
+
+    def play_chunk_blocking(self, audio):
+        """
+        Play a pre-generated audio array. Blocks until playback finishes.
+        Used by StreamingTTS's player thread.
+        """
+        if audio is None or len(audio) == 0:
+            return
+        self._play_audio(audio)
     def _generate_audio(self, text):
         """Generate audio array for text. Uses cache."""
         if text in self.cache:
@@ -237,7 +274,6 @@ class TTSManager:
         """Non-blocking speech with optional completion callback."""
         self.speak(text, voice=voice, block=False, on_complete=on_complete)
 
-
 # Global instance
 _tts_instance = TTSManager()
 
@@ -273,3 +309,11 @@ def set_tts_volume(volume):
 
 def get_tts_volume():
     return int(_tts_instance.get_volume() * 100)
+def generate_chunk_for_streaming(text):
+    """Synthesize text, return audio array. No playback. For StreamingTTS."""
+    return _tts_instance.generate_chunk(text)
+
+
+def play_chunk_blocking(audio):
+    """Play pre-generated audio array, block until done. For StreamingTTS."""
+    _tts_instance.play_chunk_blocking(audio)

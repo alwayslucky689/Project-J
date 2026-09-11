@@ -8,7 +8,7 @@ import os
 import shutil
 import threading
 import time
-from tts_manager import speak_async
+from tts.tts_manager import speak_async
 from config import settings
 from config.personality_manager import PersonalityManager
 from tools import youtube, spotify, discord, ollama, ookla, personality_tools
@@ -97,7 +97,7 @@ def ask_ollama(prompt_text, is_json=False, model=None):
         return ai_output
 
 
-def ask_ollama_streaming(prompt_text, model=None):
+def ask_ollama_streaming(prompt_text, model=None, streamer=None):
     model = model or settings.FAST_MODEL
 
     if not OLLAMA_EXE:
@@ -126,6 +126,8 @@ def ask_ollama_streaming(prompt_text, model=None):
             print(char, end="", flush=True)
             full_response += char
             char_count += 1
+            if streamer is not None:
+                streamer.push_token(char)   # ← only addition
 
         process.wait()
 
@@ -137,7 +139,6 @@ def ask_ollama_streaming(prompt_text, model=None):
     except Exception as e:
         print(f"\n❌ Error: {e}")
         return ""
-
 
 # ===== TTS Wrapper — blocks until playback finishes =====
 def _speak_safe(text):
@@ -168,6 +169,29 @@ def _speak_safe(text):
         if audio_pipeline:
             audio_pipeline.set_speaking(False)
 
+def _streamed_response(prompt, model=None):
+    """
+    Stream LLM output, feeding tokens to TTS sentence-by-sentence.
+    Blocks until all audio has finished playing.
+    """
+    if not settings.ENABLE_TTS:
+        return ask_ollama_streaming(prompt, model=model)
+    from tts import streaming_tts
+    from tts.streaming_tts import StreamingTTS
+
+    streamer = StreamingTTS()
+    streamer.start()
+
+    if audio_pipeline:
+        audio_pipeline.set_speaking(True)
+
+    try:
+        response = ask_ollama_streaming(prompt, model=model, streamer=streamer)
+        streamer.finish()
+        return response
+    finally:
+        if audio_pipeline:
+            audio_pipeline.set_speaking(False)
 
 # ===== Command Router =====
 def route_request(user_input):
@@ -187,15 +211,13 @@ def route_request(user_input):
     is_question = user_input.strip().endswith("?") or any(user_input.lower().startswith(w) for w in question_keywords)
 
     if is_question:
-        prompt = f"""Answer the user's question naturally, conversationally, and accurately.
-Be concise but helpful. Don't mention that you're an AI.
+            prompt = f"""Answer the user's question naturally, conversationally, and accurately.
+    Be concise but helpful. Don't mention that you're an AI.
 
-User: {user_input}
-Assistant:"""
-        response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
-        if response:
-            _speak_safe(response)
-        return {"response": response, "was_streamed": True}
+    User: {user_input}
+    Assistant:"""
+            response = _streamed_response(prompt, model=settings.REASONING_MODEL)
+            return {"response": response, "was_streamed": True}
 
     action_keywords = ["open", "play", "search", "start", "run", "remember", "switch",
                        "change", "test", "pause", "resume", "next", "previous", "mute",
@@ -216,9 +238,7 @@ Assistant:"""
 If they're asking for something, answer directly. If it's a command, tell them clearly.
 
 Your response (natural language):"""
-    response = ask_ollama_streaming(default_prompt, model=settings.REASONING_MODEL)
-    if response:
-        _speak_safe(response)
+    response = _streamed_response(default_prompt, model=settings.REASONING_MODEL)
     return {"response": response, "was_streamed": True}
 
 
@@ -304,32 +324,32 @@ def execute_single_action(action):
         elif tool_name == "quick_speed_test":
             return ookla.quick_speed_test()
         elif tool_name == "mute_tts":
-            from tts_manager import mute_tts
+            from tts.tts_manager import mute_tts
             mute_tts()
             return "🔇 Voice output muted. I'll only respond in text."
         elif tool_name == "unmute_tts":
-            from tts_manager import unmute_tts
+            from tts.tts_manager import unmute_tts
             unmute_tts()
             return "🔊 Voice output enabled."
         elif tool_name == "toggle_tts":
-            from tts_manager import toggle_mute, is_muted
+            from tts.tts_manager import toggle_mute, is_muted
             toggle_mute()
             current = "muted" if is_muted() else "enabled"
             return f"🔊 Voice output {current}."
         elif tool_name == "set_tts_volume":
-            from tts_manager import set_tts_volume
+            from tts.tts_manager import set_tts_volume
             volume = action.get("volume", 70)
             set_tts_volume(volume)
             return f"🔊 TTS volume set to {volume}%"
         elif tool_name == "raise_tts_volume":
-            from tts_manager import get_tts_volume, set_tts_volume
+            from tts.tts_manager import get_tts_volume, set_tts_volume
             amount = action.get("amount", 10)
             current = get_tts_volume()
             new_vol = min(100, current + amount)
             set_tts_volume(new_vol)
             return f"🔊 TTS volume increased to {new_vol}%"
         elif tool_name == "lower_tts_volume":
-            from tts_manager import get_tts_volume, set_tts_volume
+            from tts.tts_manager import get_tts_volume, set_tts_volume
             amount = action.get("amount", 10)
             current = get_tts_volume()
             new_vol = max(0, current - amount)
