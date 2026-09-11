@@ -1,4 +1,4 @@
-# assistant.py - Complete with voice pipeline
+# assistant.py - Complete with voice pipeline and blocking TTS
 
 import re
 import subprocess
@@ -21,7 +21,6 @@ STT_VENV_PYTHON = r"venv_stt\Scripts\python.exe"
 STT_SERVICE_SCRIPT = r"stt\stt_service.py"
 
 
-# Find ollama.exe
 def get_ollama_path():
     possible_paths = [
         r"C:\Program Files\Ollama\ollama.exe",
@@ -38,16 +37,15 @@ OLLAMA_EXE = get_ollama_path()
 if not OLLAMA_EXE:
     print("⚠️ Ollama not found. Please add it to your PATH.")
 
-# 1. Initialize Personality Manager
+# Initialize Personality Manager
 personality_mgr = PersonalityManager()
 personality_tools.init_personality_tools(personality_mgr)
 
 # Global references
 audio_pipeline = None
-_speaking_lock = threading.Lock()
 
 
-# 2. Helper: Build the full system prompt with memory
+# ===== System Prompt Builder =====
 def build_system_prompt():
     base_system = personality_mgr.get_prompt("system")
     facts = get_facts_context()
@@ -56,7 +54,7 @@ def build_system_prompt():
     return base_system.replace("{user_facts}", "")
 
 
-# 3. HTTP API Call (for commands, non-streaming)
+# ===== Ollama Calls =====
 def ask_ollama(prompt_text, is_json=False, model=None):
     model = model or settings.FAST_MODEL
 
@@ -99,7 +97,6 @@ def ask_ollama(prompt_text, is_json=False, model=None):
         return ai_output
 
 
-# 4. Streaming function using subprocess (for questions)
 def ask_ollama_streaming(prompt_text, model=None):
     model = model or settings.FAST_MODEL
 
@@ -142,9 +139,38 @@ def ask_ollama_streaming(prompt_text, model=None):
         return ""
 
 
-# 5. Command Router
+# ===== TTS Wrapper — blocks until playback finishes =====
+def _speak_safe(text):
+    """
+    Speak and block until playback finishes.
+    While TTS is playing, the audio pipeline ignores all input.
+    """
+    if not text:
+        return
+    if not settings.ENABLE_TTS:
+        return
+
+    if audio_pipeline:
+        audio_pipeline.set_speaking(True)
+
+    done = threading.Event()
+
+    def _on_complete():
+        done.set()
+
+    try:
+        speak_async(text, on_complete=_on_complete)
+        # Wait up to 60s for long responses
+        done.wait(timeout=60)
+    except Exception as e:
+        print(f"⚠️ TTS error: {e}")
+    finally:
+        if audio_pipeline:
+            audio_pipeline.set_speaking(False)
+
+
+# ===== Command Router =====
 def route_request(user_input):
-    # Check for personality switch
     detected = personality_mgr.detect_personality(user_input)
     if detected and personality_mgr.switch_to(detected):
         for word in personality_mgr.get_wake_words(detected):
@@ -155,7 +181,6 @@ def route_request(user_input):
             _speak_safe(response)
             return {"response": response, "was_streamed": False}
 
-    # Step 1: Check if it's a question
     question_keywords = ["what", "why", "how", "when", "where", "who", "which",
                          "does", "do", "is", "are", "did", "could", "would",
                          "should", "will", "can", "tell me", "explain", "describe"]
@@ -172,8 +197,9 @@ Assistant:"""
             _speak_safe(response)
         return {"response": response, "was_streamed": True}
 
-    # Step 2: Check for command keywords
-    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "set", "lower", "raise", "clear", "list", "queue"]
+    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch",
+                       "change", "test", "pause", "resume", "next", "previous", "mute",
+                       "unmute", "set", "lower", "raise", "clear", "list", "queue"]
     is_command = any(word in user_input.lower() for word in action_keywords)
 
     if is_command:
@@ -186,7 +212,6 @@ Assistant:"""
         result = execute_tool(decision)
         return {"response": result, "was_streamed": False}
 
-    # Step 3: Default natural conversation
     default_prompt = f"""The user said: {user_input}. Respond naturally and helpfully.
 If they're asking for something, answer directly. If it's a command, tell them clearly.
 
@@ -197,33 +222,7 @@ Your response (natural language):"""
     return {"response": response, "was_streamed": True}
 
 
-def _speak_safe(text):
-    """Speak, but pause VAD/wake word while TTS is playing."""
-    if not text:
-        return
-    if not settings.ENABLE_TTS:
-        return
-
-    if audio_pipeline:
-        audio_pipeline.set_speaking(True)
-    try:
-        speak_async(text)
-    finally:
-        # Give TTS a moment to actually start before we unpause
-        # (speak_async returns immediately; actual playback continues)
-        threading.Timer(1.0, _unpause_after_tts).start()
-
-
-def _unpause_after_tts():
-    """Called after TTS has had time to finish (approximate)."""
-    # Approximate: pause for a reasonable duration based on text length
-    # This is a heuristic — we can't easily know when pygame finishes
-    # We'll unpause after a fixed delay
-    if audio_pipeline:
-        audio_pipeline.set_speaking(False)
-
-
-# 6. Tool Executor
+# ===== Tool Executor =====
 def execute_tool(decision):
     if isinstance(decision, list):
         results = []
@@ -247,8 +246,7 @@ def execute_single_action(action):
             results = youtube.search_youtube(action.get("query"), action.get("max_results", 5))
             if results:
                 return f"✅ Found {len(results)} videos. You can say 'play video 1' to play the first one."
-            else:
-                return "❌ No videos found."
+            return "❌ No videos found."
         elif tool_name == "play_youtube_video":
             index = action.get("index", 1)
             success = youtube.play_youtube_video(index)
@@ -341,8 +339,7 @@ def execute_single_action(action):
             fact = action.get("fact")
             if fact:
                 return save_fact(fact)
-            else:
-                return "❌ No fact provided to remember."
+            return "❌ No fact provided to remember."
         elif tool_name == "change_personality":
             return personality_tools.change_personality(action.get("name"))
         elif tool_name == "ask_question":
@@ -355,23 +352,33 @@ def execute_single_action(action):
         return f"❌ Error executing {tool_name}: {str(e)}"
 
 
-# ===== Callback: what to do when STT produces text =====
+# ===== Voice Callback =====
 def on_transcription(text):
     """Called by audio_pipeline with recognized speech."""
     print(f"\n🗣️  Processing: {text}")
-    result = route_request(text)
 
-    # Print response if not already streamed
-    if result is not None:
-        if isinstance(result, dict):
-            response_text = result.get("response", "")
-            if not result.get("was_streamed", False) and response_text:
-                print(f"🤖 {response_text}")
-        elif isinstance(result, str) and result.strip():
-            print(f"🤖 {result}")
+    # Block audio for the entire duration of processing + TTS
+    if audio_pipeline:
+        audio_pipeline.set_speaking(True)
+
+    try:
+        result = route_request(text)
+
+        if result is not None:
+            if isinstance(result, dict):
+                response_text = result.get("response", "")
+                if not result.get("was_streamed", False) and response_text:
+                    print(f"🤖 {response_text}")
+            elif isinstance(result, str) and result.strip():
+                print(f"🤖 {result}")
+    finally:
+        # If TTS was used, _speak_safe already released the flag.
+        # If TTS was skipped (muted / disabled), release it here.
+        if audio_pipeline:
+            audio_pipeline.set_speaking(False)
 
 
-# ===== Main Loop =====
+# ===== Main =====
 def main():
     global audio_pipeline
 
@@ -380,7 +387,6 @@ def main():
     print("=" * 60)
     print(f"Personality: {personality_mgr.get_current_name()}")
 
-    # Start audio pipeline (voice mode)
     try:
         audio_pipeline = AudioPipeline(
             on_transcription=on_transcription,
@@ -401,7 +407,6 @@ def main():
     print("Type 'quit' to exit.")
     print("-" * 60 + "\n")
 
-    # Text input loop
     while True:
         try:
             user_input = input("⌨️  You: ")
@@ -424,7 +429,6 @@ def main():
         except Exception as e:
             print(f"❌ Error: {e}")
 
-    # Cleanup
     if audio_pipeline:
         audio_pipeline.stop()
     print("👋 Goodbye!")

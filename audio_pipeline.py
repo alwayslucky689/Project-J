@@ -253,6 +253,98 @@ class AudioPipeline:
         try:
             # Convert to float32 [-1, 1]
             audio = indata.flatten().astype(np.float32) / 32768.0
+
+            # If TTS is speaking, ignore everything (don't hear ourselves)
+            if self.is_speaking:
+                return
+
+            with self.state_lock:
+                state = self.state
+
+            # ===== SLEEPING: only wake word matters =====
+            if state == State.SLEEPING:
+                if self.wakeword.push_audio(audio):
+                    print("🎤 Wake word detected!")
+                    # Reset VAD and per-utterance state
+                    if hasattr(self.vad, 'reset'):
+                        try:
+                            self.vad.reset()
+                        except Exception:
+                            pass
+                    self.audio_buffer = []
+                    self.consecutive_speech = 0
+                    self.consecutive_silence = 0
+                    self.listen_start_time = python_time.time()
+                    self._transition_to(State.LISTENING)
+                return
+
+            # ===== LISTENING: buffer audio, watch for end-of-speech =====
+            if state == State.LISTENING:
+                is_speech = self.vad.detect(audio)
+                self.audio_buffer.append(audio.copy())
+
+                if is_speech:
+                    self.consecutive_speech += 1
+                    self.consecutive_silence = 0
+                else:
+                    self.consecutive_silence += 1
+
+                end_of_speech = (
+                    self.consecutive_speech >= VAD_MIN_SPEECH_CHUNKS
+                    and self.consecutive_silence >= VAD_MIN_SILENCE_CHUNKS
+                )
+
+                elapsed = python_time.time() - self.listen_start_time
+                timeout = elapsed > MAX_LISTEN_SECONDS
+
+                if end_of_speech or timeout:
+                    if timeout and self.consecutive_speech == 0:
+                        print("⏱️ Listen timeout with no speech, going back to sleep.")
+                        self._transition_to(State.SLEEPING)
+                        return
+
+                    self._transition_to(State.PROCESSING)
+                    threading.Thread(
+                        target=self._process_and_respond,
+                        daemon=True,
+                    ).start()
+                return
+
+            # ===== FOLLOW_UP: like LISTENING but no wake word needed =====
+            if state == State.FOLLOW_UP:
+                is_speech = self.vad.detect(audio)
+
+                if is_speech:
+                    print("🎤 Follow-up speech detected")
+                    if hasattr(self.vad, 'reset'):
+                        try:
+                            self.vad.reset()
+                        except Exception:
+                            pass
+                    self.audio_buffer = [audio.copy()]
+                    self.consecutive_speech = 1
+                    self.consecutive_silence = 0
+                    self.listen_start_time = python_time.time()
+                    self._transition_to(State.LISTENING)
+                else:
+                    if self.followup_silence_start == 0.0:
+                        self.followup_silence_start = python_time.time()
+                    elif python_time.time() - self.followup_silence_start > FOLLOWUP_SILENCE_SECONDS:
+                        print(f"⏱️ {FOLLOWUP_SILENCE_SECONDS}s of silence, back to sleep.")
+                        self._transition_to(State.SLEEPING)
+                        self.followup_silence_start = 0.0
+                return
+
+        except Exception as e:
+            if not hasattr(self, '_error_shown'):
+                print(f"⚠️ Audio callback error: {e}")
+                import traceback
+                traceback.print_exc()
+                self._error_shown = True
+
+        try:
+            # Convert to float32 [-1, 1]
+            audio = indata.flatten().astype(np.float32) / 32768.0
             rms = float(np.sqrt(np.mean(audio ** 2)))
 
             # If TTS is speaking, ignore everything (don't hear ourselves)
