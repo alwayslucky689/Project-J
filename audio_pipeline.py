@@ -33,7 +33,7 @@ WAKEWORD_THRESHOLD = 0.4
 VAD_MODEL = "precise"
 VAD_MODE = "gradual"
 VAD_THRESHOLD = 0.55
-VAD_MIN_SILENCE_CHUNKS = 3   # 480ms silence ends a segment
+VAD_MIN_SILENCE_CHUNKS = 2   # 480ms silence ends a segment
 VAD_MIN_SPEECH_CHUNKS = 1    # at least 160ms of speech
 
 # Follow-up
