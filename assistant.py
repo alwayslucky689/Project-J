@@ -1,4 +1,4 @@
-# assistant.py - Complete version with wake word detection
+# assistant.py - Complete with voice pipeline
 
 import re
 import subprocess
@@ -13,7 +13,13 @@ from config import settings
 from config.personality_manager import PersonalityManager
 from tools import youtube, spotify, discord, ollama, ookla, personality_tools
 from memory.fact_memory import get_facts_context, save_fact
-from wakeword_detector import start_wake_detection, stop_wake_detection
+from audio_pipeline import AudioPipeline
+
+
+# ===== Paths =====
+STT_VENV_PYTHON = r"venv_stt\Scripts\python.exe"
+STT_SERVICE_SCRIPT = r"stt\stt_service.py"
+
 
 # Find ollama.exe
 def get_ollama_path():
@@ -27,6 +33,7 @@ def get_ollama_path():
             return path
     return None
 
+
 OLLAMA_EXE = get_ollama_path()
 if not OLLAMA_EXE:
     print("⚠️ Ollama not found. Please add it to your PATH.")
@@ -35,9 +42,10 @@ if not OLLAMA_EXE:
 personality_mgr = PersonalityManager()
 personality_tools.init_personality_tools(personality_mgr)
 
-# Global state for wake word (prevents overlapping triggers)
-_is_wake_mode = False
-_wake_lock = threading.Lock()
+# Global references
+audio_pipeline = None
+_speaking_lock = threading.Lock()
+
 
 # 2. Helper: Build the full system prompt with memory
 def build_system_prompt():
@@ -47,10 +55,11 @@ def build_system_prompt():
         return base_system.replace("{user_facts}", facts)
     return base_system.replace("{user_facts}", "")
 
+
 # 3. HTTP API Call (for commands, non-streaming)
 def ask_ollama(prompt_text, is_json=False, model=None):
     model = model or settings.FAST_MODEL
-    
+
     try:
         response = requests.post(
             url=settings.OLLAMA_URL,
@@ -64,19 +73,19 @@ def ask_ollama(prompt_text, is_json=False, model=None):
         )
     except requests.exceptions.RequestException as e:
         return {"tool": "error", "message": f"Connection error: {e}"} if is_json else f"Error: {e}"
-    
+
     if response.status_code != 200:
         return {"tool": "error", "message": f"Ollama error: {response.status_code}"} if is_json else f"Error: {response.status_code}"
-    
+
     try:
         data = response.json()
         ai_output = data.get("response", "").strip()
     except json.JSONDecodeError:
         return {"tool": "error", "message": "Invalid JSON response"} if is_json else "Error: Invalid response"
-    
+
     if not ai_output:
         return {"tool": "error", "message": "Empty response"} if is_json else "I didn't get a response."
-    
+
     if is_json:
         try:
             json_match = re.search(r'\{.*\}', ai_output, re.DOTALL)
@@ -89,16 +98,17 @@ def ask_ollama(prompt_text, is_json=False, model=None):
     else:
         return ai_output
 
+
 # 4. Streaming function using subprocess (for questions)
 def ask_ollama_streaming(prompt_text, model=None):
     model = model or settings.FAST_MODEL
-    
+
     if not OLLAMA_EXE:
         print("❌ Ollama not found! Using HTTP API instead.")
         return ask_ollama(prompt_text, is_json=False, model=model)
-    
+
     print("🤖 ", end="", flush=True)
-    
+
     try:
         process = subprocess.Popen(
             [OLLAMA_EXE, "run", model, prompt_text],
@@ -108,10 +118,10 @@ def ask_ollama_streaming(prompt_text, model=None):
             bufsize=1,
             universal_newlines=True
         )
-        
+
         full_response = ""
         char_count = 0
-        
+
         while True:
             char = process.stdout.read(1)
             if not char:
@@ -119,18 +129,18 @@ def ask_ollama_streaming(prompt_text, model=None):
             print(char, end="", flush=True)
             full_response += char
             char_count += 1
-        
+
         process.wait()
-        
-        # Only add newline if there was actual content
+
         if char_count > 0:
             print()
-        
+
         return full_response.strip()
-        
+
     except Exception as e:
         print(f"\n❌ Error: {e}")
         return ""
+
 
 # 5. Command Router
 def route_request(user_input):
@@ -142,50 +152,76 @@ def route_request(user_input):
         print(f"🧠 Switched personality to: {detected}")
         if not user_input:
             response = f"💬 {detected.capitalize()} personality active. How can I help?"
-            if settings.ENABLE_TTS:
-                speak_async(response)
+            _speak_safe(response)
             return {"response": response, "was_streamed": False}
-    
+
     # Step 1: Check if it's a question
-    question_keywords = ["what", "why", "how", "when", "where", "who", "which", 
-                         "does", "do", "is", "are", "did", "could", "would", 
+    question_keywords = ["what", "why", "how", "when", "where", "who", "which",
+                         "does", "do", "is", "are", "did", "could", "would",
                          "should", "will", "can", "tell me", "explain", "describe"]
     is_question = user_input.strip().endswith("?") or any(user_input.lower().startswith(w) for w in question_keywords)
-    
+
     if is_question:
-        prompt = f"""Answer the user's question naturally, conversationally, and accurately. 
+        prompt = f"""Answer the user's question naturally, conversationally, and accurately.
 Be concise but helpful. Don't mention that you're an AI.
 
 User: {user_input}
 Assistant:"""
         response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
-        if settings.ENABLE_TTS and response:
-            speak_async(response)
-        return {"response": response, "was_streamed": True}  # Already printed
-    
+        if response:
+            _speak_safe(response)
+        return {"response": response, "was_streamed": True}
+
     # Step 2: Check for command keywords
     action_keywords = ["open", "play", "search", "start", "run", "remember", "switch", "change", "test", "pause", "resume", "next", "previous", "mute", "unmute", "set", "lower", "raise", "clear", "list", "queue"]
     is_command = any(word in user_input.lower() for word in action_keywords)
-    
+
     if is_command:
         system_context = build_system_prompt()
         command_template = personality_mgr.get_prompt("command")
         prompt = command_template.replace("{user_input}", user_input)
         full_prompt = f"{system_context}\n\n{prompt}"
-        
+
         decision = ask_ollama(full_prompt, is_json=True, model=settings.FAST_MODEL)
         result = execute_tool(decision)
-        return {"response": result, "was_streamed": False}  # Not printed yet
-    
+        return {"response": result, "was_streamed": False}
+
     # Step 3: Default natural conversation
     default_prompt = f"""The user said: {user_input}. Respond naturally and helpfully.
 If they're asking for something, answer directly. If it's a command, tell them clearly.
 
 Your response (natural language):"""
     response = ask_ollama_streaming(default_prompt, model=settings.REASONING_MODEL)
-    if settings.ENABLE_TTS and response:
-        speak_async(response)
+    if response:
+        _speak_safe(response)
     return {"response": response, "was_streamed": True}
+
+
+def _speak_safe(text):
+    """Speak, but pause VAD/wake word while TTS is playing."""
+    if not text:
+        return
+    if not settings.ENABLE_TTS:
+        return
+
+    if audio_pipeline:
+        audio_pipeline.set_speaking(True)
+    try:
+        speak_async(text)
+    finally:
+        # Give TTS a moment to actually start before we unpause
+        # (speak_async returns immediately; actual playback continues)
+        threading.Timer(1.0, _unpause_after_tts).start()
+
+
+def _unpause_after_tts():
+    """Called after TTS has had time to finish (approximate)."""
+    # Approximate: pause for a reasonable duration based on text length
+    # This is a heuristic — we can't easily know when pygame finishes
+    # We'll unpause after a fixed delay
+    if audio_pipeline:
+        audio_pipeline.set_speaking(False)
+
 
 # 6. Tool Executor
 def execute_tool(decision):
@@ -199,6 +235,7 @@ def execute_tool(decision):
     else:
         result = execute_single_action(decision)
         return str(result) if result is not None else ""
+
 
 def execute_single_action(action):
     tool_name = action.get("tool")
@@ -317,103 +354,62 @@ def execute_single_action(action):
     except Exception as e:
         return f"❌ Error executing {tool_name}: {str(e)}"
 
-# ==========================================
-# 7. Wake Word Callback
-# ==========================================
 
-def on_wake_word(confidence):
-    """
-    Called when the wake word is detected.
-    For now, prompts for text input.
-    Later this will be replaced with STT.
-    """
-    global _is_wake_mode
-    
-    with _wake_lock:
-        if _is_wake_mode:
-            return  # Already processing
-        _is_wake_mode = True
-    
-    try:
-        print(f"\n🎤 Assistant is now listening... (confidence: {confidence:.2f})")
-        
-        # Optional: play a subtle chime
-        try:
-            import winsound
-            winsound.Beep(800, 150)
-        except:
-            pass
-        
-        # TODO: Replace this with STT
-        print("📢 Speak your command (type it for now)...")
-        user_input = input("🎤 You: ")
-        
-        if user_input.lower() in ["quit", "exit", "bye"]:
-            print("👋 Goodbye!")
-            return
-        
-        # Process through existing router
-        result = route_request(user_input)
-        
-        # Handle response
-        if result and isinstance(result, dict):
+# ===== Callback: what to do when STT produces text =====
+def on_transcription(text):
+    """Called by audio_pipeline with recognized speech."""
+    print(f"\n🗣️  Processing: {text}")
+    result = route_request(text)
+
+    # Print response if not already streamed
+    if result is not None:
+        if isinstance(result, dict):
             response_text = result.get("response", "")
             if not result.get("was_streamed", False) and response_text:
                 print(f"🤖 {response_text}")
-            if settings.ENABLE_TTS and response_text:
-                speak_async(response_text)
-                
-    except Exception as e:
-        print(f"❌ Error processing voice command: {e}")
-    finally:
-        with _wake_lock:
-            _is_wake_mode = False
-        print("🎤 Listening for wake word again...")
+        elif isinstance(result, str) and result.strip():
+            print(f"🤖 {result}")
 
-# ==========================================
-# 8. The Main Loop
-# ==========================================
 
+# ===== Main Loop =====
 def main():
+    global audio_pipeline
+
     print("=" * 60)
-    print("🤖 Project-J AI Assistant Ready!")
+    print("🤖 Project-J AI Assistant")
     print("=" * 60)
-    print(f"📋 Current personality: {personality_mgr.get_current_name()}")
-    print(f"🔊 Wake words: {personality_mgr.get_wake_words()}")
-    print("💡 Type 'quit' to exit.")
-    print("🎤 Say 'Jarvis' or 'Hey Jarvis' to wake me up!")
-    print("📝 You can also type commands directly.")
-    print("-" * 60)
-    
-    # Start wake word detection
+    print(f"Personality: {personality_mgr.get_current_name()}")
+
+    # Start audio pipeline (voice mode)
     try:
-        model_path = "models/wakeword/jarvis_robust_final/jarvis_robust.onnx"
-        
-        if os.path.exists(model_path):
-            print(f"🔊 Loading wake word model from: {model_path}")
-            start_wake_detection(
-                callback=on_wake_word,
-                model_path=model_path,
-                threshold=0.4
-            )
-        else:
-            print(f"⚠️ Model not found at: {model_path}")
-            print("💡 Continuing with text input only.")
+        audio_pipeline = AudioPipeline(
+            on_transcription=on_transcription,
+            stt_venv_python=STT_VENV_PYTHON,
+            stt_service_script=STT_SERVICE_SCRIPT,
+        )
+        audio_pipeline.start()
     except Exception as e:
-        print(f"⚠️ Wake word detection failed to start: {e}")
+        print(f"⚠️ Could not start voice pipeline: {e}")
+        import traceback
+        traceback.print_exc()
         print("💡 Continuing with text input only.")
-    
-    print("\n💬 Type your commands or say 'Jarvis' to wake me up!\n")
-    
-    # Text input loop (fallback)
+        audio_pipeline = None
+
+    print("\n" + "-" * 60)
+    print("💬 Text mode available — type commands directly.")
+    print("🎤 Voice mode — say 'Jarvis' to wake.")
+    print("Type 'quit' to exit.")
+    print("-" * 60 + "\n")
+
+    # Text input loop
     while True:
         try:
-            user_input = input("⌨️ You: ")
+            user_input = input("⌨️  You: ")
             if user_input.lower() in ["quit", "exit", "bye"]:
                 break
-            
+
             result = route_request(user_input)
-            
+
             if result is not None:
                 if isinstance(result, dict):
                     response_text = result.get("response", "")
@@ -421,20 +417,18 @@ def main():
                         print(f"🤖 {response_text}")
                 elif isinstance(result, str) and result.strip():
                     print(f"🤖 {result}")
-                
+
         except KeyboardInterrupt:
             print("\n👋 Goodbye!")
             break
         except Exception as e:
             print(f"❌ Error: {e}")
-    
+
     # Cleanup
-    try:
-        stop_wake_detection()
-    except:
-        pass
-    
+    if audio_pipeline:
+        audio_pipeline.stop()
     print("👋 Goodbye!")
+
 
 if __name__ == "__main__":
     main()

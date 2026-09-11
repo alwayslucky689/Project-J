@@ -14,3 +14,5 @@ maybe implement in c or c++ for faster
 c++ in android
 add google maps functionality with directions/bus
 add travana next bus check
+feynman for checking studies
+nvidia personal ai router
