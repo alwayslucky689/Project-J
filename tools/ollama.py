@@ -48,25 +48,3 @@ def ask_question(question):
     except Exception as e:
         return f"Error: {str(e)}"
 
-def is_question(text):
-    """Check if text is a question"""
-    text = text.strip()
-    if text.endswith("?"):
-        return True
-    
-    question_words = ["what", "why", "how", "when", "where", "who", "which", 
-                      "does", "do", "is", "are", "did", "could", "would", 
-                      "should", "will", "can", "tell me", "explain", 
-                      "describe", "define", "meaning of", "definition of"]
-    
-    lower_text = text.lower()
-    for word in question_words:
-        if lower_text.startswith(word) or f" {word} " in lower_text:
-            return True
-    
-    return False
-
-__all__ = [
-    'ask_question',
-    'is_question'
-]
