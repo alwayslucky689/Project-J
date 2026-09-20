@@ -15,18 +15,18 @@ import wave
 from collections import deque
 from enum import Enum
 
-# Import wake word + VAD
 from wakeword_detector import WakeWordDetector
 from javad.stream import Pipeline as VadPipeline
+from config.paths import WAKEWORD_MODEL_PATH, STT_UTTERANCE_WAV, TEMP_DIR
 
+WAKEWORD_MODEL = str(WAKEWORD_MODEL_PATH)
+TEMP_WAV = str(STT_UTTERANCE_WAV)
 
 # ===== Configuration =====
 SAMPLE_RATE = 16000
 CHUNK_MS = 160
 CHUNK_SIZE = int(SAMPLE_RATE * CHUNK_MS / 1000)  # 2560 samples
 
-# Wake word
-WAKEWORD_MODEL = "models/wakeword/jarvis_robust_final/jarvis_robust.onnx"
 WAKEWORD_THRESHOLD = 0.3
 
 # VAD
@@ -40,9 +40,6 @@ VAD_MIN_SPEECH_CHUNKS = 2
 FOLLOWUP_SILENCE_SECONDS = 4.0
 MAX_LISTEN_SECONDS = 15.0
 
-# Temp file
-TEMP_DIR = "data/tmp"
-TEMP_WAV = os.path.join(TEMP_DIR, "utterance.wav")
 
 
 class State(Enum):

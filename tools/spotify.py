@@ -9,6 +9,8 @@ import webbrowser
 import time
 import re
 from config import settings
+from config.paths import SPOTIFY_CACHE
+
 
 class SpotifyController:
     def __init__(self):
@@ -32,7 +34,7 @@ class SpotifyController:
                 client_secret=settings.SPOTIFY_CLIENT_SECRET,
                 redirect_uri=settings.SPOTIFY_REDIRECT_URI,
                 scope=scope,
-                cache_path=".spotify_cache"
+                cache_path=str(SPOTIFY_CACHE)
             ))
             
             user = self.sp.current_user()

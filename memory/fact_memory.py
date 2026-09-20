@@ -1,11 +1,10 @@
 import json
 import os
 
-MEMORY_DIR = "data"
-FACTS_FILE = os.path.join(MEMORY_DIR, "facts.json")
+from config.paths import FACTS_FILE
 
-# Ensure the data folder exists
-os.makedirs(MEMORY_DIR, exist_ok=True)
+# FACTS_FILE is a Path object; convert to str for json/open()
+FACTS_FILE = str(FACTS_FILE)
 
 def load_facts():
     """Loads all stored facts from the JSON file."""

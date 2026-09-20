@@ -17,10 +17,9 @@ except ImportError:
 os.environ.setdefault("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
 
 
-# ===== Voice cloning config =====
-# Path to the reference audio for voice cloning.
-# Must be 3–10 seconds of clean speech.
-VOICE_REF_AUDIO = "prompts/system/jarvis_sample.wav"
+from config.paths import JARVIS_VOICE_SAMPLE
+
+VOICE_REF_AUDIO = str(JARVIS_VOICE_SAMPLE)
 
 # Exact transcription of the reference audio.
 # Set to None to let OmniVoice auto-transcribe via Whisper (slower, less accurate).

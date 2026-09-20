@@ -5,8 +5,9 @@ Discord-related functions for the AI Assistant
 
 import subprocess
 import os
+from config.paths import DISCORD_EXE
 
-DISCORD_PATH = r"C:\Users\pstef\AppData\Local\Discord\Update.exe"
+DISCORD_PATH = DISCORD_EXE
 
 def open_discord():
     """Opens Discord desktop app"""

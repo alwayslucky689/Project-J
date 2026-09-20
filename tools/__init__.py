@@ -3,7 +3,6 @@
 Tools package for the AI Assistant
 """
 from tts import tts_manager
-from tools import history
 from tools import youtube
 from tools import spotify
 from collections import deque

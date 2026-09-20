@@ -1,4 +1,7 @@
 restructure to contain personalities and commands in one file 
+maybe instead of concrete commands and a command for each little thing use something like jev ultrafast or something to browse the web
+browsing the web for relevant info(current is years old) like anysearch(if jev ultrafast doesnt already do it)
+then let the llm itself decide what to do with it maybe would make it faster?
 then just pick and choose from that file?
 and for the personality to actually dictate his reply not the text in assistant
 have to fix or change the tts cause it stutters too much
@@ -9,10 +12,4 @@ refactor to not have so many elifs
 add functionality for a stronger model for strong thinking like a qwen 35b or 27b
 maybe layer offloading on ram or splitting the load between my pc and laptop
 llmfit to see if it Runs
-add memory
-maybe implement in c or c++ for faster 
-c++ in android
-add google maps functionality with directions/bus
-add travana next bus check
-feynman for checking studies
-nvidia personal ai router
+add memory maybe something like cognee or similar?
