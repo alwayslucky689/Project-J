@@ -2,7 +2,7 @@
 """
 Spotify Controller - Lazy Loading (only connects when needed)
 """
-
+from core.registry import register, Tool, Permission
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import webbrowser
@@ -469,3 +469,204 @@ __all__ = [
     'get_current_track',
     'clear_queue'
 ]
+# ===== Registry registration =====
+#
+# Most Spotify handlers return True/False. Adapters normalize argument names
+# (the LLM emits "song"/"artist"/"volume"/"amount"); formatters turn the
+# boolean into a user-facing string.
+
+def _fmt_bool(success_text, fail_text):
+    def fmt(result):
+        return success_text if result else fail_text
+    return fmt
+
+
+def _fmt_play_song(result):
+    return "▶️ Playing song" if result else "❌ Could not play song"
+
+
+def _fmt_queue_song(result):
+    return "🎵 Queued song" if result else "❌ Could not queue song"
+
+
+def _fmt_play_playlist(result):
+    return "▶️ Playing playlist" if result else "❌ Could not play playlist"
+
+
+def _fmt_list_playlists(playlists):
+    if playlists:
+        return f"📋 Listed {len(playlists)} playlists in the console."
+    return "❌ No playlists found."
+
+
+def _fmt_set_volume(result, volume):
+    return f"🔊 Volume set to {volume}%" if result else "❌ Failed to set volume"
+
+
+def _fmt_raise_volume(result, amount):
+    return f"🔊 Volume increased by {amount}%" if result else "❌ Failed to raise volume"
+
+
+def _fmt_lower_volume(result, amount):
+    return f"🔊 Volume decreased by {amount}%" if result else "❌ Failed to lower volume"
+
+
+# Adapters (LLM args → function signature)
+def _sp_play_song(song, artist=None):
+    return play_spotify_song(song, artist)
+
+def _sp_queue_song(song, artist=None):
+    return queue_spotify_song(song, artist)
+
+def _sp_set_volume(volume=50):
+    return set_volume(volume), volume  # (result, echo)
+
+def _sp_raise_volume(amount=10):
+    return raise_volume(amount), amount
+
+def _sp_lower_volume(amount=10):
+    return lower_volume(amount), amount
+
+def _sp_open():
+    return open_spotify()
+
+
+# Formatters that unpack tuples from the volume adapters
+def _fmt_set_volume_pair(pair):
+    result, volume = pair
+    return _fmt_set_volume(result, volume)
+
+def _fmt_raise_volume_pair(pair):
+    result, amount = pair
+    return _fmt_raise_volume(result, amount)
+
+def _fmt_lower_volume_pair(pair):
+    result, amount = pair
+    return _fmt_lower_volume(result, amount)
+
+
+register(Tool(
+    name="open_spotify",
+    description="Opens Spotify in the browser. Takes no arguments.",
+    handler=_sp_open,
+    formatter=_fmt_bool("✅ Opened Spotify", "❌ Failed to open Spotify"),
+    permission=Permission.ACTION,
+    response_key="spotify_opened",
+))
+
+register(Tool(
+    name="play_spotify_song",
+    description='Plays a song. Takes "song" (string) and optional "artist" (string).',
+    handler=_sp_play_song,
+    formatter=_fmt_play_song,
+    permission=Permission.ACTION,
+    response_key="song_playing",
+))
+
+register(Tool(
+    name="queue_spotify_song",
+    description='Queues a song. Takes "song" (string) and optional "artist" (string).',
+    handler=_sp_queue_song,
+    formatter=_fmt_queue_song,
+    permission=Permission.ACTION,
+    response_key="song_queued",
+))
+
+register(Tool(
+    name="play_spotify_playlist",
+    description='Plays a playlist from Spotify\'s catalog. Takes "playlist" (string).',
+    handler=play_spotify_playlist,
+    formatter=_fmt_play_playlist,
+    permission=Permission.ACTION,
+    response_key="playlist_playing",
+))
+
+register(Tool(
+    name="play_my_playlist",
+    description='Plays a playlist from the user\'s library. Takes "playlist" (string).',
+    handler=play_my_playlist,
+    formatter=_fmt_play_playlist,
+    permission=Permission.ACTION,
+    response_key="playlist_playing",
+))
+
+register(Tool(
+    name="list_playlists",
+    description="Lists the user's Spotify playlists. Takes no arguments.",
+    handler=list_playlists,
+    formatter=_fmt_list_playlists,
+    permission=Permission.SAFE,
+    response_key="playlists_listed",
+))
+
+register(Tool(
+    name="pause_spotify",
+    description="Pauses playback. Takes no arguments.",
+    handler=pause_spotify,
+    formatter=_fmt_bool("⏸️ Paused", "❌ Failed to pause"),
+    permission=Permission.ACTION,
+    response_key="playback_paused",
+))
+
+register(Tool(
+    name="resume_spotify",
+    description="Resumes playback. Takes no arguments.",
+    handler=resume_spotify,
+    formatter=_fmt_bool("▶️ Resumed", "❌ Failed to resume"),
+    permission=Permission.ACTION,
+    response_key="playback_resumed",
+))
+
+register(Tool(
+    name="next_track",
+    description="Skips to the next track. Takes no arguments.",
+    handler=next_track,
+    formatter=_fmt_bool("⏭️ Next track", "❌ Failed to skip"),
+    permission=Permission.ACTION,
+    response_key="track_skipped",
+))
+
+register(Tool(
+    name="previous_track",
+    description="Goes to the previous track. Takes no arguments.",
+    handler=previous_track,
+    formatter=_fmt_bool("⏮️ Previous track", "❌ Failed to go back"),
+    permission=Permission.ACTION,
+    response_key="track_previous",
+))
+
+register(Tool(
+    name="set_volume",
+    description='Sets Spotify volume. Takes "volume" (integer 0-100).',
+    handler=_sp_set_volume,
+    formatter=_fmt_set_volume_pair,
+    permission=Permission.ACTION,
+    response_key="volume_set",
+))
+
+register(Tool(
+    name="raise_volume",
+    description='Raises Spotify volume. Takes optional "amount" (integer, default 10).',
+    handler=_sp_raise_volume,
+    formatter=_fmt_raise_volume_pair,
+    permission=Permission.ACTION,
+    response_key="volume_raised",
+))
+
+register(Tool(
+    name="lower_volume",
+    description='Lowers Spotify volume. Takes optional "amount" (integer, default 10).',
+    handler=_sp_lower_volume,
+    formatter=_fmt_lower_volume_pair,
+    permission=Permission.ACTION,
+    response_key="volume_lowered",
+))
+
+register(Tool(
+    name="clear_queue",
+    description="Clears the Spotify queue. Takes no arguments.",
+    handler=clear_queue,
+    formatter=_fmt_bool("🎵 Queue cleared", "❌ Failed to clear queue"),
+    permission=Permission.ACTION,
+    response_key="queue_cleared",
+))

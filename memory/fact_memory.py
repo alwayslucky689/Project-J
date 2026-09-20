@@ -1,6 +1,6 @@
 import json
 import os
-
+from core.registry import register, Tool, Permission
 from config.paths import FACTS_FILE
 
 # FACTS_FILE is a Path object; convert to str for json/open()
@@ -28,3 +28,15 @@ def get_facts_context():
     if not facts:
         return ""
     return "Known facts about the user:\n- " + "\n- ".join(facts)
+def _remember_fact(fact):
+    return save_fact(fact)
+
+
+register(Tool(
+    name="remember_fact",
+    description='Stores a fact about the user. Takes "fact" (string).',
+    handler=_remember_fact,
+    formatter=lambda s: s,  # returns "✓ Remembered: ..." already
+    permission=Permission.SAFE,
+    response_key="fact_saved",
+))

@@ -3,7 +3,7 @@
 Ookla Speed Test Module
 Can run in background or browser with result extraction
 """
-
+from core.registry import register, Tool, Permission
 import subprocess
 import re
 import json
@@ -193,3 +193,25 @@ __all__ = [
     'quick_speed_test',
     'OoklaSpeedTest'
 ]
+def _run_speed_test(background=True):
+    results = run_speed_test(background=background)
+    return get_formatted_results(results)
+
+
+register(Tool(
+    name="run_speed_test",
+    description='Runs an internet speed test. Takes optional "background" (boolean, default true).',
+    handler=_run_speed_test,
+    formatter=lambda s: s,  # already formatted
+    permission=Permission.SAFE,
+    response_key="speed_test_running",
+))
+
+register(Tool(
+    name="quick_speed_test",
+    description="Runs a quick internet speed test. Takes no arguments.",
+    handler=quick_speed_test,
+    formatter=lambda s: s,  # already formatted
+    permission=Permission.SAFE,
+    response_key="speed_test_running",
+))

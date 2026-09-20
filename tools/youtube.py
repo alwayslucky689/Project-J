@@ -2,7 +2,7 @@
 """
 YouTube-related functions for the AI Assistant
 """
-
+from core.registry import register, Tool, Permission
 import yt_dlp
 import webbrowser
 import re
@@ -146,3 +146,57 @@ __all__ = [
     'clear_youtube_search',
     'youtube_session'
 ]
+# ===== Registry registration =====
+#
+# The LLM emits argument names ("query", "index") that don't always match
+# the public function signatures, so we use small adapter functions and
+# explicit formatters. This keeps youtube.py's public API unchanged.
+
+def _handle_search_youtube(query, max_results=5):
+    return search_youtube(query, max_results)
+
+
+def _handle_play_youtube_video(index=1):
+    return play_youtube_video(index)
+
+
+def _fmt_open_youtube(result):
+    return "✅ Opened YouTube" if result else "❌ Failed to open YouTube"
+
+
+def _fmt_search_youtube(result):
+    if result:
+        return f"✅ Found {len(result)} videos. You can say 'play video 1' to play the first one."
+    return "❌ No videos found."
+
+
+def _fmt_play_youtube_video(result):
+    return "▶️ Playing video" if result else "❌ Could not play video."
+
+
+register(Tool(
+    name="open_youtube",
+    description='Opens YouTube. Takes optional "search_query" (string).',
+    handler=open_youtube,
+    formatter=_fmt_open_youtube,
+    permission=Permission.ACTION,
+    response_key="youtube_opened",
+))
+
+register(Tool(
+    name="search_youtube",
+    description='Searches YouTube. Takes "query" (string) and optional "max_results" (integer).',
+    handler=_handle_search_youtube,
+    formatter=_fmt_search_youtube,
+    permission=Permission.SAFE,
+    response_key="youtube_search",
+))
+
+register(Tool(
+    name="play_youtube_video",
+    description='Plays a video from search results. Takes "index" (integer, 1-based).',
+    handler=_handle_play_youtube_video,
+    formatter=_fmt_play_youtube_video,
+    permission=Permission.ACTION,
+    response_key="youtube_play",
+))

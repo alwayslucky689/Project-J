@@ -2,7 +2,7 @@
 """
 Discord-related functions for the AI Assistant
 """
-
+from core.registry import register, Tool, Permission
 import subprocess
 import os
 from config.paths import DISCORD_EXE
@@ -27,3 +27,15 @@ __all__ = [
     'open_discord',
     'check_discord_installed'
 ]
+def _fmt_open_discord(result):
+    return "✅ Opened Discord" if result else "❌ Failed to open Discord"
+
+
+register(Tool(
+    name="open_discord",
+    description="Opens the Discord desktop app. Takes no arguments.",
+    handler=open_discord,
+    formatter=_fmt_open_discord,
+    permission=Permission.ACTION,
+    response_key="app_opened",
+))

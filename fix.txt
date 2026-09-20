@@ -1,0 +1,5 @@
+fix tts output garbage
+fix wake word detecting fantom words
+fix mic too low volume/detection
+fix stt picking up a little too much
+fix not being able to quit with voice commands

@@ -2,6 +2,7 @@
 """
 Ollama/AI-related functions for the AI Assistant
 """
+from core.registry import register, Tool, Permission
 from config import settings
 import requests
 import json
@@ -48,3 +49,11 @@ def ask_question(question):
     except Exception as e:
         return f"Error: {str(e)}"
 
+register(Tool(
+    name="ask_question",
+    description='Answers a general question. Takes "question" (string). Used as a fallback when no other tool fits.',
+    handler=ask_question,
+    formatter=lambda s: s,  # already natural language
+    permission=Permission.SAFE,
+    response_key="asked_question",
+))
