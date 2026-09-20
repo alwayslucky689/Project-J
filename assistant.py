@@ -1,4 +1,5 @@
-# assistant.py - Complete with voice pipeline and blocking TTS
+# assistant.py - Merged: wakeword + parakeet STT + blocking TTS
+# Phase 0 cleanup: single return contract, blocking TTS, voice pipeline
 
 import re
 import subprocess
@@ -7,7 +8,8 @@ import requests
 import os
 import shutil
 import threading
-import time
+from dataclasses import dataclass
+
 from tts.tts_manager import speak_async
 from config import settings
 from config.personality_manager import PersonalityManager
@@ -25,7 +27,7 @@ def get_ollama_path():
     possible_paths = [
         r"C:\Program Files\Ollama\ollama.exe",
         r"C:\Users\pstef\AppData\Local\Programs\Ollama\ollama.exe",
-        shutil.which("ollama")
+        shutil.which("ollama"),
     ]
     for path in possible_paths:
         if path and os.path.exists(path):
@@ -37,12 +39,20 @@ OLLAMA_EXE = get_ollama_path()
 if not OLLAMA_EXE:
     print("⚠️ Ollama not found. Please add it to your PATH.")
 
-# Initialize Personality Manager
+
+# ===== Response contract =====
+@dataclass
+class AssistantResponse:
+    text: str = ""
+    was_streamed: bool = False   # True if already printed during streaming
+    speak: bool = True           # Whether the caller should TTS this
+
+
+# ===== Initialization =====
 personality_mgr = PersonalityManager()
 personality_tools.init_personality_tools(personality_mgr)
 
-# Global references
-audio_pipeline = None
+audio_pipeline = None  # type: AudioPipeline | None
 
 
 # ===== System Prompt Builder =====
@@ -65,9 +75,9 @@ def ask_ollama(prompt_text, is_json=False, model=None):
                 "model": model,
                 "prompt": prompt_text,
                 "stream": False,
-                "temperature": 0.1 if is_json else 0.7
+                "temperature": 0.1 if is_json else 0.7,
             },
-            timeout=30
+            timeout=30,
         )
     except requests.exceptions.RequestException as e:
         return {"tool": "error", "message": f"Connection error: {e}"} if is_json else f"Error: {e}"
@@ -86,26 +96,31 @@ def ask_ollama(prompt_text, is_json=False, model=None):
 
     if is_json:
         try:
-            json_match = re.search(r'\{.*\}', ai_output, re.DOTALL)
+            json_match = re.search(r"\{.*\}", ai_output, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
-            else:
-                return {"tool": "error", "message": f"No JSON found in: {ai_output[:200]}"}
+            return {"tool": "error", "message": f"No JSON found in: {ai_output[:200]}"}
         except json.JSONDecodeError:
             return {"tool": "error", "message": f"Invalid JSON: {ai_output[:200]}"}
     else:
         return ai_output
 
 
-def ask_ollama_streaming(prompt_text, model=None, streamer=None):
+def ask_ollama_streaming(prompt_text, model=None):
+    """
+    Streams tokens to the terminal. Returns the full response text.
+    Streamed output is already visible to the user, so callers should
+    NOT reprint — but they SHOULD still synthesize via _speak_safe().
+    """
     model = model or settings.FAST_MODEL
 
     if not OLLAMA_EXE:
         print("❌ Ollama not found! Using HTTP API instead.")
-        return ask_ollama(prompt_text, is_json=False, model=model)
+        result = ask_ollama(prompt_text, is_json=False, model=model)
+        print(f"🤖 {result}")
+        return result
 
     print("🤖 ", end="", flush=True)
-
     try:
         process = subprocess.Popen(
             [OLLAMA_EXE, "run", model, prompt_text],
@@ -113,12 +128,11 @@ def ask_ollama_streaming(prompt_text, model=None, streamer=None):
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
-            universal_newlines=True
+            universal_newlines=True,
         )
 
         full_response = ""
         char_count = 0
-
         while True:
             char = process.stdout.read(1)
             if not char:
@@ -126,33 +140,26 @@ def ask_ollama_streaming(prompt_text, model=None, streamer=None):
             print(char, end="", flush=True)
             full_response += char
             char_count += 1
-            if streamer is not None:
-                streamer.push_token(char)   # ← only addition
 
         process.wait()
-
         if char_count > 0:
             print()
-
         return full_response.strip()
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
         return ""
 
-# ===== TTS Wrapper — blocks until playback finishes =====
+
+# ===== TTS (blocking) =====
 def _speak_safe(text):
     """
     Speak and block until playback finishes.
-    While TTS is playing, the audio pipeline ignores all input.
+    Does NOT toggle audio_pipeline.set_speaking — the caller owns that
+    so we have a single toggle point around the whole request lifecycle.
     """
-    if not text:
+    if not text or not settings.ENABLE_TTS:
         return
-    if not settings.ENABLE_TTS:
-        return
-
-    if audio_pipeline:
-        audio_pipeline.set_speaking(True)
 
     done = threading.Event()
 
@@ -161,67 +168,50 @@ def _speak_safe(text):
 
     try:
         speak_async(text, on_complete=_on_complete)
-        # Wait up to 60s for long responses
         done.wait(timeout=60)
     except Exception as e:
         print(f"⚠️ TTS error: {e}")
-    finally:
-        if audio_pipeline:
-            audio_pipeline.set_speaking(False)
 
-def _streamed_response(prompt, model=None):
-    """
-    Stream LLM output, feeding tokens to TTS sentence-by-sentence.
-    Blocks until all audio has finished playing.
-    """
-    if not settings.ENABLE_TTS:
-        return ask_ollama_streaming(prompt, model=model)
-    from tts import streaming_tts
-    from tts.streaming_tts import StreamingTTS
-
-    streamer = StreamingTTS()
-    streamer.start()
-
-    if audio_pipeline:
-        audio_pipeline.set_speaking(True)
-
-    try:
-        response = ask_ollama_streaming(prompt, model=model, streamer=streamer)
-        streamer.finish()
-        return response
-    finally:
-        if audio_pipeline:
-            audio_pipeline.set_speaking(False)
 
 # ===== Command Router =====
-def route_request(user_input):
+def route_request(user_input: str) -> AssistantResponse:
+    # --- Personality wake-word check ---
     detected = personality_mgr.detect_personality(user_input)
     if detected and personality_mgr.switch_to(detected):
         for word in personality_mgr.get_wake_words(detected):
             user_input = user_input.lower().replace(word.lower(), "").strip()
         print(f"🧠 Switched personality to: {detected}")
         if not user_input:
-            response = f"💬 {detected.capitalize()} personality active. How can I help?"
-            _speak_safe(response)
-            return {"response": response, "was_streamed": False}
+            return AssistantResponse(
+                text=f"{detected.capitalize()} personality active. How can I help?"
+            )
 
-    question_keywords = ["what", "why", "how", "when", "where", "who", "which",
-                         "does", "do", "is", "are", "did", "could", "would",
-                         "should", "will", "can", "tell me", "explain", "describe"]
-    is_question = user_input.strip().endswith("?") or any(user_input.lower().startswith(w) for w in question_keywords)
+    # --- Question path (streamed to terminal, then spoken) ---
+    question_keywords = [
+        "what", "why", "how", "when", "where", "who", "which",
+        "does", "do", "is", "are", "did", "could", "would",
+        "should", "will", "can", "tell me", "explain", "describe",
+    ]
+    is_question = (
+        user_input.strip().endswith("?")
+        or any(user_input.lower().startswith(w) for w in question_keywords)
+    )
 
     if is_question:
-            prompt = f"""Answer the user's question naturally, conversationally, and accurately.
-    Be concise but helpful. Don't mention that you're an AI.
+        prompt = f"""Answer the user's question naturally, conversationally, and accurately.
+Be concise but helpful. Don't mention that you're an AI.
 
-    User: {user_input}
-    Assistant:"""
-            response = _streamed_response(prompt, model=settings.REASONING_MODEL)
-            return {"response": response, "was_streamed": True}
+User: {user_input}
+Assistant:"""
+        response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
+        return AssistantResponse(text=response, was_streamed=True)
 
-    action_keywords = ["open", "play", "search", "start", "run", "remember", "switch",
-                       "change", "test", "pause", "resume", "next", "previous", "mute",
-                       "unmute", "set", "lower", "raise", "clear", "list", "queue"]
+    # --- Command path (JSON tool call, non-streamed) ---
+    action_keywords = [
+        "open", "play", "search", "start", "run", "remember", "switch",
+        "change", "test", "pause", "resume", "next", "previous", "mute",
+        "unmute", "set", "lower", "raise", "clear", "list", "queue",
+    ]
     is_command = any(word in user_input.lower() for word in action_keywords)
 
     if is_command:
@@ -232,14 +222,15 @@ def route_request(user_input):
 
         decision = ask_ollama(full_prompt, is_json=True, model=settings.FAST_MODEL)
         result = execute_tool(decision)
-        return {"response": result, "was_streamed": False}
+        return AssistantResponse(text=result, was_streamed=False)
 
+    # --- Default chat (streamed to terminal, then spoken) ---
     default_prompt = f"""The user said: {user_input}. Respond naturally and helpfully.
 If they're asking for something, answer directly. If it's a command, tell them clearly.
 
 Your response (natural language):"""
-    response = _streamed_response(default_prompt, model=settings.REASONING_MODEL)
-    return {"response": response, "was_streamed": True}
+    response = ask_ollama_streaming(default_prompt, model=settings.REASONING_MODEL)
+    return AssistantResponse(text=response, was_streamed=True)
 
 
 # ===== Tool Executor =====
@@ -251,9 +242,8 @@ def execute_tool(decision):
             if result is not None:
                 results.append(str(result))
         return "\n".join(results) if results else ""
-    else:
-        result = execute_single_action(decision)
-        return str(result) if result is not None else ""
+    result = execute_single_action(decision)
+    return str(result) if result is not None else ""
 
 
 def execute_single_action(action):
@@ -372,28 +362,27 @@ def execute_single_action(action):
         return f"❌ Error executing {tool_name}: {str(e)}"
 
 
+# ===== Response handler (shared by voice + text) =====
+def handle_response(response: AssistantResponse):
+    """Single place that prints (if needed) and speaks a response."""
+    if response.text and not response.was_streamed:
+        print(f"🤖 {response.text}")
+    if settings.ENABLE_TTS and response.speak and response.text:
+        _speak_safe(response.text)
+
+
 # ===== Voice Callback =====
 def on_transcription(text):
     """Called by audio_pipeline with recognized speech."""
     print(f"\n🗣️  Processing: {text}")
 
-    # Block audio for the entire duration of processing + TTS
+    # Block the mic for the entire request + TTS lifecycle
     if audio_pipeline:
         audio_pipeline.set_speaking(True)
-
     try:
-        result = route_request(text)
-
-        if result is not None:
-            if isinstance(result, dict):
-                response_text = result.get("response", "")
-                if not result.get("was_streamed", False) and response_text:
-                    print(f"🤖 {response_text}")
-            elif isinstance(result, str) and result.strip():
-                print(f"🤖 {result}")
+        response = route_request(text)
+        handle_response(response)
     finally:
-        # If TTS was used, _speak_safe already released the flag.
-        # If TTS was skipped (muted / disabled), release it here.
         if audio_pipeline:
             audio_pipeline.set_speaking(False)
 
@@ -429,23 +418,19 @@ def main():
 
     while True:
         try:
-            user_input = input("⌨️  You: ")
-            if user_input.lower() in ["quit", "exit", "bye"]:
-                break
-
-            result = route_request(user_input)
-
-            if result is not None:
-                if isinstance(result, dict):
-                    response_text = result.get("response", "")
-                    if not result.get("was_streamed", False) and response_text:
-                        print(f"🤖 {response_text}")
-                elif isinstance(result, str) and result.strip():
-                    print(f"🤖 {result}")
-
-        except KeyboardInterrupt:
+            user_input = input("⌨️  You: ").strip()
+        except (EOFError, KeyboardInterrupt):
             print("\n👋 Goodbye!")
             break
+
+        if not user_input:
+            continue
+        if user_input.lower() in ["quit", "exit", "bye"]:
+            break
+
+        try:
+            response = route_request(user_input)
+            handle_response(response)
         except Exception as e:
             print(f"❌ Error: {e}")
 

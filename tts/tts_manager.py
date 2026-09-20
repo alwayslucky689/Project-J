@@ -1,98 +1,103 @@
-# tts_manager.py - Complete with on_complete callback support
+# tts/tts_manager.py - Lazy-loaded singleton with voice cloning
 
 import os
 import time
-import unicodedata
 import threading
 import subprocess
 import platform
-import torch
-import soundfile as sf
 import numpy as np
-from omnivoice import OmniVoice
-from omnivoice import VoiceClonePrompt
 
 try:
-    import pygame
-    HAS_PYGAME = True
+    import sounddevice as sd
+    HAS_SOUNDDEVICE = True
 except ImportError:
-    HAS_PYGAME = False
-    print("⚠️ pygame-ce not installed. Install with: pip install pygame-ce")
+    HAS_SOUNDDEVICE = False
+    print("⚠️ sounddevice not installed. Install with: pip install sounddevice")
 
-os.environ["HF_HOME"] = "C:\\Users\\pstef\\.cache\\huggingface"
+os.environ.setdefault("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+
+
+# ===== Voice cloning config =====
+# Path to the reference audio for voice cloning.
+# Must be 3–10 seconds of clean speech.
+VOICE_REF_AUDIO = "prompts/system/jarvis_sample.wav"
+
+# Exact transcription of the reference audio.
+# Set to None to let OmniVoice auto-transcribe via Whisper (slower, less accurate).
+VOICE_REF_TEXT = "The proposed element should serve as a viable alternative for palladium. Unfortunately it is impossible to synthesize."  
 
 
 class TTSManager:
     _instance = None
-    _initialized = False
+    _init_lock = threading.Lock()
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            with cls._init_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
     def __init__(self):
-        if self._initialized:
+        if getattr(self, "_initialized", False):
             return
         self._initialized = True
         self.model = None
         self.cache = {}
         self.muted = False
         self.sample_rate = 24000
-        self.volume = 0.8
-        self.voice_prompt = None
-        self._load_model()
-        self._load_voice_prompt()
+        self.volume = 70
+        self._load_lock = threading.Lock()
+        self._loading = False
 
-        if HAS_PYGAME:
+        # Voice cloning reference
+        self.ref_audio = VOICE_REF_AUDIO
+        self.ref_text = VOICE_REF_TEXT
+
+        # Validate reference audio exists
+        if not os.path.exists(self.ref_audio):
+            print(f"⚠️ Reference audio not found: {self.ref_audio}")
+            print("   TTS will use a random voice until this is fixed.")
+            self.ref_audio = None
+            self.ref_text = None
+
+    # ---------- Lazy model load ----------
+    def _ensure_model(self):
+        if self.model is not None:
+            return True
+        with self._load_lock:
+            if self.model is not None:
+                return True
+            if self._loading:
+                while self._loading:
+                    time.sleep(0.05)
+                return self.model is not None
+            self._loading = True
             try:
-                pygame.mixer.init(frequency=self.sample_rate, size=-16, channels=2)
-                print("🔊 Pygame-ce mixer initialized (stereo).")
-            except Exception as e:
-                print(f"⚠️ Could not initialize pygame mixer: {e}")
-
-    def _load_model(self):
-        print("🎤 Loading TTS model on GPU (this may take a few seconds)...")
-        try:
-            self.model = OmniVoice.from_pretrained(
-                "k2-fsa/OmniVoice",
-                device_map="cuda:0",
-                dtype=torch.float16,
-                local_files_only=True
-            )
-            print("✅ TTS model loaded successfully.")
-        except Exception as e:
-            print(f"❌ Failed to load TTS model: {e}")
-            self.model = None
-
-    def _load_voice_prompt(self):
-        prompt_path = "prompts/system/jarvis_voice.pt"
-        if os.path.exists(prompt_path):
-            try:
-                self.voice_prompt = VoiceClonePrompt.load(prompt_path)
-                return
-            except Exception:
-                self.voice_prompt = None
-                return
-
-        ref_audio_path = "prompts/system/jarvis_sample.wav"
-        if os.path.exists(ref_audio_path) and self.model is not None:
-            try:
-                self.voice_prompt = self.model.create_voice_clone_prompt(
-                    ref_audio=ref_audio_path,
-                    ref_text="Your actual transcription here."
+                print("🎤 Loading TTS model on GPU (first speak only)...")
+                import torch
+                from omnivoice import OmniVoice
+                self.model = OmniVoice.from_pretrained(
+                    "k2-fsa/OmniVoice",
+                    device_map="cuda:0",
+                    dtype=torch.float16,
+                    local_files_only=True,
                 )
-                self.voice_prompt.save(prompt_path)
-            except Exception:
-                self.voice_prompt = None
+                print("✅ TTS model loaded.")
+                if self.ref_audio:
+                    print(f"🎙️ Voice cloning reference: {self.ref_audio}")
+                else:
+                    print("⚠️ No reference audio — using random voice.")
+                return True
+            except Exception as e:
+                print(f"❌ Failed to load TTS model: {e}")
+                self.model = None
+                return False
+            finally:
+                self._loading = False
 
-    def set_volume(self, volume):
-        self.volume = max(0.0, min(1.0, volume))
-        print(f"🔊 TTS volume set to {int(self.volume * 100)}%")
-
-    def get_volume(self):
-        return self.volume
-
+    # ---------- Mute + volume ----------
     def set_mute(self, muted: bool):
         self.muted = muted
         state = "🔇 MUTED (text only)" if muted else "🔊 Voice output ENABLED"
@@ -100,166 +105,102 @@ class TTSManager:
 
     def toggle_mute(self):
         self.set_mute(not self.muted)
-    # ============ Streaming helpers ============
 
-    def generate_chunk(self, text):
-        """
-        Synthesize text and return the raw audio array. No playback.
+    def set_volume(self, volume: int):
+        self.volume = max(0, min(100, int(volume)))
+        print(f"🔊 TTS volume: {self.volume}%")
 
-        Used by StreamingTTS. Normalization matches _play_audio's
-        convention so consecutive chunks sound consistent.
-        """
-        if not text or not self.model or self.muted:
-            return None
+    def get_volume(self) -> int:
+        return self.volume
 
-        audio = self._generate_audio(text)
-        if audio is None:
-            return None
-
-        # Same normalization as speak() uses
-        if isinstance(audio, list):
-            audio = np.array(audio)
-        if audio.ndim > 1:
-            audio = audio.flatten()
-
-        audio = audio.astype(np.float32)
-        max_val = np.max(np.abs(audio))
-        if max_val > 0:
-            audio = audio / max_val
-
-        return audio
-
-    def play_chunk_blocking(self, audio):
-        """
-        Play a pre-generated audio array. Blocks until playback finishes.
-        Used by StreamingTTS's player thread.
-        """
-        if audio is None or len(audio) == 0:
-            return
-        self._play_audio(audio)
-    def _generate_audio(self, text):
-        """Generate audio array for text. Uses cache."""
-        if text in self.cache:
-            return self.cache[text]
-        try:
-            if self.voice_prompt:
-                audio = self.model.generate(
-                    text=text,
-                    num_step=32,
-                    speed=1.0,
-                    voice_clone_prompt=self.voice_prompt,
-                )
-            else:
-                audio = self.model.generate(
-                    text=text,
-                    num_step=32,
-                    speed=1.0,
-                    instruct="male, british accent, medium pitch",
-                )
-            self.cache[text] = audio
-            return audio
-        except Exception as e:
-            print(f"❌ TTS generation error: {e}")
-            return None
-
+    # ---------- Speak ----------
     def speak(self, text, voice=None, block=False, on_complete=None):
-        """
-        Generate and play speech.
+        if not text or len(text) < 5:
+            if on_complete:
+                on_complete()
+            return
 
-        Args:
-            text: Text to speak
-            voice: Unused (kept for API compatibility)
-            block: If True, wait for playback to finish before returning
-            on_complete: Optional callback invoked when playback finishes
-                         (called from the playback thread, so it must be
-                         thread-safe / non-blocking)
-        """
-        if not text or not self.model:
-            if on_complete:
-                try:
-                    on_complete()
-                except Exception:
-                    pass
-            return
-        if len(text) < 5:
-            if on_complete:
-                try:
-                    on_complete()
-                except Exception:
-                    pass
-            return
         if self.muted:
             print(f"Assistant: {text[:60]}...")
             if on_complete:
-                try:
-                    on_complete()
-                except Exception:
-                    pass
+                on_complete()
             return
 
-        audio = self._generate_audio(text)
-        if audio is None:
+        if not self._ensure_model():
             if on_complete:
-                try:
-                    on_complete()
-                except Exception:
-                    pass
+                on_complete()
             return
 
-        # Normalize to float32 numpy array
+        # Cache lookup
+        if text in self.cache:
+            audio = self.cache[text]
+        else:
+            try:
+                # Build generation kwargs — this is where voice cloning happens
+                gen_kwargs = {
+                    "text": text,
+                    "num_step": 32,
+                    "speed": 1.0,
+                }
+
+                # Pass the reference audio for voice cloning
+                if self.ref_audio and os.path.exists(self.ref_audio):
+                    gen_kwargs["ref_audio"] = self.ref_audio
+                    if self.ref_text:
+                        gen_kwargs["ref_text"] = self.ref_text
+                    # If ref_text is None, OmniVoice auto-transcribes via Whisper
+
+                audio = self.model.generate(**gen_kwargs)
+                self.cache[text] = audio
+            except Exception as e:
+                print(f"❌ TTS generation error: {e}")
+                if on_complete:
+                    on_complete()
+                return
+
+        # Post-process
         if isinstance(audio, list):
             audio = np.array(audio)
         if audio.ndim > 1:
             audio = audio.flatten()
-
         audio = audio.astype(np.float32)
-        max_val = np.max(np.abs(audio))
+        max_val = np.max(np.abs(audio)) if audio.size else 0.0
         if max_val > 0:
             audio = audio / max_val
 
+        # Apply volume
+        if self.volume < 100:
+            audio = audio * (self.volume / 100.0)
+
         if block:
-            self._play_audio(audio)
-            if on_complete:
-                try:
+            try:
+                self._play_audio(audio)
+            finally:
+                if on_complete:
                     on_complete()
-                except Exception as e:
-                    print(f"⚠️ on_complete callback error: {e}")
         else:
             def _run():
                 try:
                     self._play_audio(audio)
                 finally:
                     if on_complete:
-                        try:
-                            on_complete()
-                        except Exception as e:
-                            print(f"⚠️ on_complete callback error: {e}")
+                        on_complete()
             threading.Thread(target=_run, daemon=True).start()
 
     def _play_audio(self, audio):
-        """Play audio using pygame-ce with file fallback."""
         try:
-            scaled_audio = audio * self.volume
-
-            if HAS_PYGAME:
+            if HAS_SOUNDDEVICE:
                 try:
-                    audio_int16 = (scaled_audio * 32767).astype(np.int16)
-                    if audio_int16.ndim == 1:
-                        audio_int16 = np.column_stack((audio_int16, audio_int16))
-                    sound = pygame.sndarray.make_sound(audio_int16)
-                    sound.play()
-                    # Block until playback finishes
-                    while pygame.mixer.get_busy():
-                        pygame.time.wait(10)
+                    sd.play(audio, self.sample_rate)
+                    sd.wait()
                     return
                 except Exception as e:
-                    print(f"❌ Pygame playback error: {e}")
+                    print(f"❌ sounddevice playback error: {e}")
 
-            # Fallback: save WAV and use OS player
+            import soundfile as sf
             temp_file = "tts_output.wav"
-            sf.write(temp_file, scaled_audio, self.sample_rate)
+            sf.write(temp_file, audio, self.sample_rate)
             time.sleep(0.1)
-
             system = platform.system()
             if system == "Windows":
                 subprocess.run(["start", temp_file], shell=True, check=False, capture_output=True)
@@ -270,50 +211,39 @@ class TTSManager:
         except Exception as e:
             print(f"❌ Playback error: {e}")
 
-    def speak_async(self, text, voice=None, on_complete=None):
-        """Non-blocking speech with optional completion callback."""
-        self.speak(text, voice=voice, block=False, on_complete=on_complete)
 
-# Global instance
-_tts_instance = TTSManager()
+# ===== Module-level API =====
+def _get():
+    return TTSManager()
 
 
-# Public functions
 def speak(text, voice=None, block=False, on_complete=None):
-    _tts_instance.speak(text, voice=voice, block=block, on_complete=on_complete)
+    _get().speak(text, voice=voice, block=block, on_complete=on_complete)
 
 
 def speak_async(text, voice=None, on_complete=None):
-    _tts_instance.speak_async(text, voice=voice, on_complete=on_complete)
+    _get().speak(text, voice=voice, block=False, on_complete=on_complete)
 
 
 def mute_tts():
-    _tts_instance.set_mute(True)
+    _get().set_mute(True)
 
 
 def unmute_tts():
-    _tts_instance.set_mute(False)
+    _get().set_mute(False)
 
 
 def toggle_mute():
-    _tts_instance.toggle_mute()
+    _get().toggle_mute()
 
 
 def is_muted():
-    return _tts_instance.muted
+    return _get().muted
 
 
 def set_tts_volume(volume):
-    _tts_instance.set_volume(volume / 100)
+    _get().set_volume(volume)
 
 
 def get_tts_volume():
-    return int(_tts_instance.get_volume() * 100)
-def generate_chunk_for_streaming(text):
-    """Synthesize text, return audio array. No playback. For StreamingTTS."""
-    return _tts_instance.generate_chunk(text)
-
-
-def play_chunk_blocking(audio):
-    """Play pre-generated audio array, block until done. For StreamingTTS."""
-    _tts_instance.play_chunk_blocking(audio)
+    return _get().get_volume()
