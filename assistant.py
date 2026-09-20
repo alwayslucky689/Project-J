@@ -1,25 +1,19 @@
 # assistant.py - Merged: wakeword + parakeet STT + blocking TTS
 # Phase 0 cleanup: single return contract, blocking TTS, voice pipeline
-
-import re
-import subprocess
-import json
-import requests
-import os
 import threading
 from dataclasses import dataclass
 
 from tts.tts_manager import speak_async
 from config import settings
-from config.personality_manager import PersonalityManager
+from core.personality import PersonalityManager
+from core.prompts import build_tool_schema, COMMAND_JSON_RULES
+from core.llm import ask_ollama, ask_ollama_streaming
+from core.registry import get_tool
 from tools import youtube, spotify, discord, ollama, ookla, personality_tools, tts_tools
 from memory.fact_memory import get_facts_context, save_fact
 from audio_pipeline import AudioPipeline
-from config.paths import OLLAMA_EXE, STT_VENV_PYTHON, STT_SERVICE_SCRIPT
-from core.registry import get_tool
+from config.paths import STT_VENV_PYTHON, STT_SERVICE_SCRIPT
 
-if not OLLAMA_EXE:
-    print("⚠️ Ollama not found. Please add it to your PATH.")
 # ===== Response contract =====
 @dataclass
 class AssistantResponse:
@@ -36,100 +30,14 @@ audio_pipeline = None  # type: AudioPipeline | None
 
 
 # ===== System Prompt Builder =====
-def build_system_prompt():
-    base_system = personality_mgr.get_prompt("system")
+def build_system_prompt(user_input: str) -> str:
+    """Full prompt for the fast model on the tool/command path."""
+    persona = personality_mgr.get_persona_prompt()
     facts = get_facts_context()
-    if facts:
-        return base_system.replace("{user_facts}", facts)
-    return base_system.replace("{user_facts}", "")
-
-
-# ===== Ollama Calls =====
-def ask_ollama(prompt_text, is_json=False, model=None):
-    model = model or settings.FAST_MODEL
-
-    try:
-        response = requests.post(
-            url=settings.OLLAMA_URL,
-            json={
-                "model": model,
-                "prompt": prompt_text,
-                "stream": False,
-                "temperature": 0.1 if is_json else 0.7,
-            },
-            timeout=30,
-        )
-    except requests.exceptions.RequestException as e:
-        return {"tool": "error", "message": f"Connection error: {e}"} if is_json else f"Error: {e}"
-
-    if response.status_code != 200:
-        return {"tool": "error", "message": f"Ollama error: {response.status_code}"} if is_json else f"Error: {response.status_code}"
-
-    try:
-        data = response.json()
-        ai_output = data.get("response", "").strip()
-    except json.JSONDecodeError:
-        return {"tool": "error", "message": "Invalid JSON response"} if is_json else "Error: Invalid response"
-
-    if not ai_output:
-        return {"tool": "error", "message": "Empty response"} if is_json else "I didn't get a response."
-
-    if is_json:
-        try:
-            json_match = re.search(r"\{.*\}", ai_output, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group(0))
-            return {"tool": "error", "message": f"No JSON found in: {ai_output[:200]}"}
-        except json.JSONDecodeError:
-            return {"tool": "error", "message": f"Invalid JSON: {ai_output[:200]}"}
-    else:
-        return ai_output
-
-
-def ask_ollama_streaming(prompt_text, model=None):
-    """
-    Streams tokens to the terminal. Returns the full response text.
-    Streamed output is already visible to the user, so callers should
-    NOT reprint — but they SHOULD still synthesize via _speak_safe().
-    """
-    model = model or settings.FAST_MODEL
-
-    if not OLLAMA_EXE:
-        print("❌ Ollama not found! Using HTTP API instead.")
-        result = ask_ollama(prompt_text, is_json=False, model=model)
-        print(f"🤖 {result}")
-        return result
-
-    print("🤖 ", end="", flush=True)
-    try:
-        process = subprocess.Popen(
-            [OLLAMA_EXE, "run", model, prompt_text],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-            universal_newlines=True,
-        )
-
-        full_response = ""
-        char_count = 0
-        while True:
-            char = process.stdout.read(1)
-            if not char:
-                break
-            print(char, end="", flush=True)
-            full_response += char
-            char_count += 1
-
-        process.wait()
-        if char_count > 0:
-            print()
-        return full_response.strip()
-
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        return ""
-
+    tool_schema = build_tool_schema()
+    rules = COMMAND_JSON_RULES.replace("{user_input}", user_input)
+    parts = [persona, facts, tool_schema, rules]
+    return "\n\n".join(p for p in parts if p)
 
 # ===== TTS (blocking) =====
 def _speak_safe(text):
@@ -163,55 +71,32 @@ def route_request(user_input: str) -> AssistantResponse:
         print(f"🧠 Switched personality to: {detected}")
         if not user_input:
             return AssistantResponse(
-                text=f"{detected.capitalize()} personality active. How can I help?"
+                text=f"{personality_mgr.get_display_name()} active. How can I help?"
             )
 
-    # --- Question path (streamed to terminal, then spoken) ---
-    question_keywords = [
-        "what", "why", "how", "when", "where", "who", "which",
-        "does", "do", "is", "are", "did", "could", "would",
-        "should", "will", "can", "tell me", "explain", "describe",
-    ]
-    is_question = (
-        user_input.strip().endswith("?")
-        or any(user_input.lower().startswith(w) for w in question_keywords)
-    )
+    # --- Single routing pass: tool or chat? ---
+    router_prompt = build_system_prompt(user_input)
+    decision = ask_ollama(router_prompt, is_json=True, model=settings.FAST_MODEL)
 
-    if is_question:
-        prompt = f"""Answer the user's question naturally, conversationally, and accurately.
-Be concise but helpful. Don't mention that you're an AI.
-
-User: {user_input}
-Assistant:"""
+    # The router signals "not a tool call" by returning ask_question.
+    # In that case, route to the chat path with the reasoning model.
+    if not isinstance(decision, dict) or decision.get("tool") == "ask_question":
+        question = user_input
+        if isinstance(decision, dict):
+            question = decision.get("question") or user_input
+        prompt = _build_chat_prompt(question)
         response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
         return AssistantResponse(text=response, was_streamed=True)
 
-    # --- Command path (JSON tool call, non-streamed) ---
-    action_keywords = [
-        "open", "play", "search", "start", "run", "remember", "switch",
-        "change", "test", "pause", "resume", "next", "previous", "mute",
-        "unmute", "set", "lower", "raise", "clear", "list", "queue",
-    ]
-    is_command = any(word in user_input.lower() for word in action_keywords)
+    # --- Tool path ---
+    result = execute_tool(decision)
+    return AssistantResponse(text=result, was_streamed=False)
 
-    if is_command:
-        system_context = build_system_prompt()
-        command_template = personality_mgr.get_prompt("command")
-        prompt = command_template.replace("{user_input}", user_input)
-        full_prompt = f"{system_context}\n\n{prompt}"
-
-        decision = ask_ollama(full_prompt, is_json=True, model=settings.FAST_MODEL)
-        result = execute_tool(decision)
-        return AssistantResponse(text=result, was_streamed=False)
-
-    # --- Default chat (streamed to terminal, then spoken) ---
-    default_prompt = f"""The user said: {user_input}. Respond naturally and helpfully.
-If they're asking for something, answer directly. If it's a command, tell them clearly.
-
-Your response (natural language):"""
-    response = ask_ollama_streaming(default_prompt, model=settings.REASONING_MODEL)
-    return AssistantResponse(text=response, was_streamed=True)
-
+def _build_chat_prompt(user_input: str) -> str:
+    """Persona + per-personality chat template, with user input filled in."""
+    persona = personality_mgr.get_persona_prompt()
+    chat = personality_mgr.get_chat_prompt().replace("{user_input}", user_input)
+    return f"{persona}\n\n{chat}"
 
 # ===== Tool Executor =====
 def execute_tool(decision):
@@ -229,25 +114,33 @@ def execute_tool(decision):
 def execute_single_action(action):
     tool_name = action.get("tool")
 
-    # Special case: the LLM signalling it errored out
     if tool_name == "error":
         return f"⚠️ AI Error: {action.get('message', 'unknown')}"
 
     tool = get_tool(tool_name)
     if tool is None:
+        # Personality-aware unknown-tool message
+        fallback = personality_mgr.render("unknown_tool")
+        if fallback:
+            return fallback
         return f"⚠️ Unknown tool: {tool_name}. AI said: {action}"
 
-    # Strip the "tool" key; everything else is a kwarg for the handler
     kwargs = {k: v for k, v in action.items() if k != "tool"}
 
     try:
         result = tool.handler(**kwargs)
-        return tool.format(result)
     except TypeError as e:
-        # Wrong argument names — LLM emitted something the handler doesn't accept
         return f"❌ Argument error for {tool_name}: {e}"
     except Exception as e:
         return f"❌ Error executing {tool_name}: {e}"
+
+    # Try personality template first — falls through to the tool's formatter
+    # if the personality doesn't define this response_key.
+    rendered = personality_mgr.render(tool.response_key, **kwargs)
+    if rendered is not None:
+        return rendered
+
+    return tool.format(result)
 
 # ===== Response handler (shared by voice + text) =====
 def handle_response(response: AssistantResponse):

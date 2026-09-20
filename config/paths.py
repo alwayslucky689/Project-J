@@ -28,7 +28,7 @@ WAKEWORD_DIR   = MODELS_DIR / "wakeword"
 PROMPTS_DIR    = PROJECT_ROOT / "prompts"
 SYSTEM_PROMPTS = PROMPTS_DIR / "system"
 LOGS_DIR       = PROJECT_ROOT / "logs"
-
+PERSONALITIES_DIR = PROJECT_ROOT / "personalities"
 # Create writable dirs on import
 for _d in (DATA_DIR, TEMP_DIR, SESSIONS_DIR, VOICES_DIR, LOGS_DIR):
     _d.mkdir(parents=True, exist_ok=True)

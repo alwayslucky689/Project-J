@@ -100,14 +100,13 @@ class TTSManager:
     def set_mute(self, muted: bool):
         self.muted = muted
         state = "🔇 MUTED (text only)" if muted else "🔊 Voice output ENABLED"
-        print(f"TTS: {state}")
 
     def toggle_mute(self):
         self.set_mute(not self.muted)
 
     def set_volume(self, volume: int):
         self.volume = max(0, min(100, int(volume)))
-        print(f"🔊 TTS volume: {self.volume}%")
+        
 
     def get_volume(self) -> int:
         return self.volume
@@ -120,7 +119,7 @@ class TTSManager:
             return
 
         if self.muted:
-            print(f"Assistant: {text[:60]}...")
+           
             if on_complete:
                 on_complete()
             return

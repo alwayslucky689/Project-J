@@ -1,59 +1,33 @@
-# tools/ollama.py
 """
-Ollama/AI-related functions for the AI Assistant
-"""
-from core.registry import register, Tool, Permission
-from config import settings
-import requests
-import json
-import re
+Ollama/AI-related tools for the AI Assistant.
 
-def ask_question(question):
-    """Sends a question to Ollama and returns a natural language answer"""
+The ask_question tool is registered here. In practice, the router in
+assistant.py intercepts ask_question as a signal to fall back to the
+streaming chat path, but keeping the tool registered means the router
+has a name it can return when it decides nothing else fits.
+"""
+
+from config import settings
+from core.llm import ask_ollama
+from core.registry import register, Tool, Permission
+
+
+def ask_question(question: str) -> str:
+    """Answer a general question via the reasoning model."""
     print(f"🤔 Answering: {question}")
-    
-    question_prompt = f"""
-    You are a helpful AI assistant. Answer the user's question naturally and accurately.
-    Be conversational. Don't mention that you're an AI.
-    
-    User: {question}
-    Assistant:"""
-    
-    try:
-        response = requests.post(
-        url="http://localhost:11434/api/generate",
-        json={
-            "model": settings.REASONING_MODEL,  # Use reasoning model
-            "prompt": question_prompt,
-            "stream": False,
-            "temperature": 0.7
-        },
-        timeout=30
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            answer = result.get("response", "").strip()
-            
-            if not answer:
-                return "I couldn't generate a response. Please try again."
-            
-            return answer
-        else:
-            return f"Error: {response.status_code} - {response.text}"
-            
-    except requests.exceptions.Timeout:
-        return "Error: Ollama is taking too long. Try again."
-    except requests.exceptions.ConnectionError:
-        return "Error: Cannot connect to Ollama. Make sure it's running."
-    except Exception as e:
-        return f"Error: {str(e)}"
+    prompt = f"""Answer the user's question naturally, conversationally, and accurately.
+Be concise but helpful. Don't mention that you're an AI.
+
+User: {question}
+Assistant:"""
+    return ask_ollama(prompt, is_json=False, model=settings.REASONING_MODEL)
+
 
 register(Tool(
     name="ask_question",
     description='Answers a general question. Takes "question" (string). Used as a fallback when no other tool fits.',
     handler=ask_question,
-    formatter=lambda s: s,  # already natural language
+    formatter=lambda s: s,
     permission=Permission.SAFE,
     response_key="asked_question",
 ))

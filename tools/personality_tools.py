@@ -1,4 +1,3 @@
-from config.personality_manager import PersonalityManager
 from core.registry import register, Tool, Permission
 # We'll pass the manager instance from assistant.py
 _personality_manager = None
