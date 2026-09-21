@@ -1,5 +1,3 @@
-# assistant.py - Merged: wakeword + parakeet STT + blocking TTS
-# Phase 0 cleanup: single return contract, blocking TTS, voice pipeline
 import threading
 from dataclasses import dataclass
 
