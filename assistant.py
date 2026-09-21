@@ -109,14 +109,9 @@ def build_system_prompt(user_input: str) -> str:
 
 # ===== TTS (blocking) =====
 def _speak_safe(text):
-    """
-    Speak and block until playback finishes.
-    Does NOT toggle audio_pipeline.set_speaking — the caller owns that
-    so we have a single toggle point around the whole request lifecycle.
-    """
     if not text or not settings.ENABLE_TTS:
         return
-
+    t0 = time.perf_counter()
     done = threading.Event()
 
     def _on_complete():
@@ -125,53 +120,58 @@ def _speak_safe(text):
     try:
         speak_async(text, on_complete=_on_complete)
         done.wait(timeout=60)
+        if getattr(settings, "TIMING", False):
+            print(f"⏱️  [tts total] {(time.perf_counter() - t0) * 1000:.0f}ms")
     except Exception as e:
         print(f"⚠️ TTS error: {e}")
 
 
 # ===== Command Router =====
 def route_request(user_input: str) -> AssistantResponse:
+    t0 = time.perf_counter()
+
     # --- Personality wake-word check ---
     detected = personality_mgr.detect_personality(user_input)
     if detected and personality_mgr.switch_to(detected):
-        for word in personality_mgr.get_wake_words(detected):
-            user_input = user_input.lower().replace(word.lower(), "").strip()
-        print(f"🧠 Switched personality to: {detected}")
-        if not user_input:
-            return AssistantResponse(
-                text=f"{personality_mgr.get_display_name()} active. How can I help?"
-            )
+        ...
+    _ts("routing", t0)
 
-    # --- Routing: deterministic short-circuit → Needle → llama fallback ---
     ref = _try_youtube_ref(user_input)
     if ref is not None:
         result = execute_tool(ref)
+        _ts("short-circuit + tool", t0)
         return AssistantResponse(text=result, was_streamed=False)
     elif settings.USE_NEEDLE_ROUTER:
+        t_route = time.perf_counter()
         decision = route_to_tool(user_input)
+        _ts("needle", t_route)
     else:
+        t_route = time.perf_counter()
         router_prompt = build_system_prompt(user_input)
         decision = ask_ollama(router_prompt, is_json=True, model=settings.FAST_MODEL)
+        _ts("llama router", t_route)
 
-    # The router signals "not a command" by returning 'chat'.
     if not isinstance(decision, dict) or decision.get("tool") == "chat":
         question = user_input
         if isinstance(decision, dict):
             question = decision.get("message") or user_input
         prompt = _build_chat_prompt(question)
+        t_llm = time.perf_counter()
         response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
+        _ts("chat first-token-to-end", t_llm)
+        _ts("total", t0)
         return AssistantResponse(text=response, was_streamed=True)
 
-    # --- Tool path ---
+    t_tool = time.perf_counter()
     result = execute_tool(decision)
+    _ts("tool exec", t_tool)
+    _ts("total", t0)
     return AssistantResponse(text=result, was_streamed=False)
-
 def _build_chat_prompt(user_input: str) -> str:
     """Persona + per-personality chat template, with user input filled in."""
     persona = personality_mgr.get_persona_prompt()
     chat = personality_mgr.get_chat_prompt().replace("{user_input}", user_input)
     return f"{persona}\n\n{chat}"
-
 # ===== Tool Executor =====
 def execute_tool(decision):
     if isinstance(decision, list):

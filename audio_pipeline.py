@@ -29,17 +29,40 @@ CHUNK_SIZE = int(SAMPLE_RATE * CHUNK_MS / 1000)  # 2560 samples
 
 WAKEWORD_THRESHOLD = 0.3
 
+# Wake word gain — applied ONLY to the wake word path, not VAD or STT.
+# 2.0 ≈ +6 dB, 3.16 ≈ +10 dB. Start low; clipping reduces accuracy.
+WAKE_WORD_GAIN = 2.0
+
 # VAD
 VAD_MODEL = "precise"
 VAD_MODE = "gradual"
 VAD_THRESHOLD = 0.6
-VAD_MIN_SILENCE_CHUNKS = 2   # 480ms silence ends a segment
-VAD_MIN_SPEECH_CHUNKS = 2   
+VAD_MIN_SILENCE_CHUNKS = 3   #  silence ends a segment
+VAD_MIN_SPEECH_CHUNKS = 3    # was 2 — raised to reject breath/noise onsets
 
 # Follow-up
-FOLLOWUP_SILENCE_SECONDS = 4.0
+FOLLOWUP_SILENCE_SECONDS = 3.0   # was 4.0 — shorter window, fewer phantom triggers
 MAX_LISTEN_SECONDS = 15.0
 
+# Minimum RMS energy required to bother sending audio to STT.
+# Rejects silent buffers that Parakeet would hallucinate on.
+MIN_UTTERANCE_RMS = 0.008
+
+# Words Parakeet invents when fed near-silence or breath noise.
+# Matched against the lowercased, punctuation-stripped transcription.
+# Any utterance longer than a single word passes through untouched.
+_PHANTOM_WORDS = {
+    "oh", "yeah", "yes", "yep", "okay", "ok", "um", "uh",
+    "hmm", "ah", "mm", "mhm", "huh",
+}
+
+
+def _is_phantom(text: str) -> bool:
+    """True if the transcription is a single filler word Parakeet hallucinates."""
+    if not text:
+        return False
+    cleaned = text.strip().lower().rstrip(".,!?")
+    return cleaned in _PHANTOM_WORDS
 
 
 class State(Enum):
@@ -243,6 +266,13 @@ class AudioPipeline:
                 print(f"🔁 State: {self.state.value} → {new_state.value}")
                 self.state = new_state
 
+    def _buffer_rms(self) -> float:
+        """RMS energy of the accumulated buffer, for the silence guard."""
+        if not self.audio_buffer:
+            return 0.0
+        audio = np.concatenate(self.audio_buffer)
+        return float(np.sqrt(np.mean(audio ** 2)))
+
     def _audio_callback(self, indata, frames, pa_time, status):
         if not self.is_running:
             return
@@ -260,7 +290,10 @@ class AudioPipeline:
 
             # ===== SLEEPING: only wake word matters =====
             if state == State.SLEEPING:
-                if self.wakeword.push_audio(audio):
+                # Amplify only for the wake word model. VAD/STT see the
+                # original audio — gain never leaks into the rest of the path.
+                amplified = np.clip(audio * WAKE_WORD_GAIN, -1.0, 1.0)
+                if self.wakeword.push_audio(amplified):
                     print("🎤 Wake word detected!")
                     if hasattr(self.vad, "reset"):
                         try:
@@ -334,6 +367,7 @@ class AudioPipeline:
                 import traceback
                 traceback.print_exc()
                 self._error_shown = True
+
     def _process_and_respond(self):
         """Save buffer, transcribe, hand text to callback."""
         try:
@@ -343,11 +377,25 @@ class AudioPipeline:
                 self._transition_to(State.SLEEPING)
                 return
 
+            # Energy guard: skip STT entirely if the buffer is basically silence.
+            # This is the real fix for phantom words — don't give Parakeet
+            # anything to hallucinate on in the first place.
+            rms = self._buffer_rms()
+            if rms < MIN_UTTERANCE_RMS:
+                print(f"🔇 Buffer RMS {rms:.4f} below threshold, skipping STT.")
+                self._transition_to(State.SLEEPING)
+                return
+
             print(f"📝 Transcribing...")
             text = self.transcribe_file(wav_path)
 
             if not text:
                 print("⚠️ Empty transcription, going back to sleep.")
+                self._transition_to(State.SLEEPING)
+                return
+
+            if _is_phantom(text):
+                print(f"⚠️ Ignoring phantom transcription: {text!r}")
                 self._transition_to(State.SLEEPING)
                 return
 

@@ -25,3 +25,4 @@ data/
 OmniVoice/
 venv_stt/
 training_data/
+venv_pocket_tts/

@@ -1,10 +1,14 @@
-# tts/tts_manager.py - Lazy-loaded singleton with voice cloning
+# tts/tts_manager.py - Lazy-loaded singleton using Pocket-TTS (CPU)
+#
+# Phase 5: TTS runs entirely on CPU. Zero VRAM cost, no stutter.
+# Public API is unchanged from the OmniVoice version — nothing outside
+# this file needs to know the engine changed.
 
 import os
 import time
 import threading
-import subprocess
 import platform
+import subprocess
 import numpy as np
 
 try:
@@ -14,16 +18,18 @@ except ImportError:
     HAS_SOUNDDEVICE = False
     print("⚠️ sounddevice not installed. Install with: pip install sounddevice")
 
-os.environ.setdefault("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+from config.paths import JARVIS_VOICE_SAMPLE, SYSTEM_PROMPTS
 
 
-from config.paths import JARVIS_VOICE_SAMPLE
-
+# Reference clip used for voice cloning on first run.
 VOICE_REF_AUDIO = str(JARVIS_VOICE_SAMPLE)
 
-# Exact transcription of the reference audio.
-# Set to None to let OmniVoice auto-transcribe via Whisper (slower, less accurate).
-VOICE_REF_TEXT = "The proposed element should serve as a viable alternative for palladium. Unfortunately it is impossible to synthesize."  
+# Cached voice state. First run clones the reference clip (slow) and writes
+# this file. Every run after that loads it in well under a second.
+VOICE_STATE_CACHE = SYSTEM_PROMPTS / "jarvis_voice.safetensors"
+
+# Built-in Pocket-TTS voice used as a fallback if cloning is unavailable.
+FALLBACK_VOICE = "alba"
 
 
 class TTSManager:
@@ -43,6 +49,7 @@ class TTSManager:
             return
         self._initialized = True
         self.model = None
+        self.voice_state = None
         self.cache = {}
         self.muted = False
         self.sample_rate = 24000
@@ -50,63 +57,74 @@ class TTSManager:
         self._load_lock = threading.Lock()
         self._loading = False
 
-        # Voice cloning reference
-        self.ref_audio = VOICE_REF_AUDIO
-        self.ref_text = VOICE_REF_TEXT
-
-        # Validate reference audio exists
-        if not os.path.exists(self.ref_audio):
-            print(f"⚠️ Reference audio not found: {self.ref_audio}")
-            print("   TTS will use a random voice until this is fixed.")
-            self.ref_audio = None
-            self.ref_text = None
-
     # ---------- Lazy model load ----------
     def _ensure_model(self):
-        if self.model is not None:
+        if self.model is not None and self.voice_state is not None:
             return True
         with self._load_lock:
-            if self.model is not None:
+            if self.model is not None and self.voice_state is not None:
                 return True
             if self._loading:
                 while self._loading:
                     time.sleep(0.05)
-                return self.model is not None
+                return self.model is not None and self.voice_state is not None
             self._loading = True
             try:
-                print("🎤 Loading TTS model on GPU (first speak only)...")
-                import torch
-                from omnivoice import OmniVoice
-                self.model = OmniVoice.from_pretrained(
-                    "k2-fsa/OmniVoice",
-                    device_map="cuda:0",
-                    dtype=torch.float16,
-                    local_files_only=True,
-                )
-                print("✅ TTS model loaded.")
-                if self.ref_audio:
-                    print(f"🎙️ Voice cloning reference: {self.ref_audio}")
-                else:
-                    print("⚠️ No reference audio — using random voice.")
+                print("🎤 Loading Pocket-TTS on CPU (first speak only)...")
+                from pocket_tts import TTSModel, export_model_state
+
+                self.model = TTSModel.load_model()
+                self.sample_rate = self.model.sample_rate
+                self.voice_state = self._load_voice_state(export_model_state)
+
+                print(f"✅ Pocket-TTS ready (sample rate {self.sample_rate}).")
                 return True
             except Exception as e:
-                print(f"❌ Failed to load TTS model: {e}")
+                print(f"❌ Failed to load Pocket-TTS: {e}")
                 self.model = None
+                self.voice_state = None
                 return False
             finally:
                 self._loading = False
+
+    def _load_voice_state(self, export_fn):
+        """
+        Prefer the cached safetensors file. If absent, clone from the
+        reference WAV (slow) and cache the result for next time.
+        """
+        if VOICE_STATE_CACHE.exists():
+            print(f"🎙️ Loading cached voice state: {VOICE_STATE_CACHE.name}")
+            return self.model.get_state_for_audio_prompt(str(VOICE_STATE_CACHE))
+
+        if not os.path.exists(VOICE_REF_AUDIO):
+            print(f"⚠️ Reference audio missing: {VOICE_REF_AUDIO}")
+            print(f"   Falling back to built-in voice: {FALLBACK_VOICE}")
+            return self.model.get_state_for_audio_prompt(FALLBACK_VOICE)
+
+        print(f"🎙️ Cloning voice from {os.path.basename(VOICE_REF_AUDIO)} "
+              f"(slow, one-time — will be cached)")
+        state = self.model.get_state_for_audio_prompt(VOICE_REF_AUDIO)
+
+        try:
+            VOICE_STATE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+            export_fn(state, str(VOICE_STATE_CACHE))
+            print(f"✅ Cached voice state → {VOICE_STATE_CACHE.name}")
+        except Exception as e:
+            print(f"⚠️ Could not cache voice state (will re-clone next run): {e}")
+
+        return state
 
     # ---------- Mute + volume ----------
     def set_mute(self, muted: bool):
         self.muted = muted
         state = "🔇 MUTED (text only)" if muted else "🔊 Voice output ENABLED"
+        print(state)
 
     def toggle_mute(self):
         self.set_mute(not self.muted)
 
     def set_volume(self, volume: int):
         self.volume = max(0, min(100, int(volume)))
-        
 
     def get_volume(self) -> int:
         return self.volume
@@ -119,7 +137,6 @@ class TTSManager:
             return
 
         if self.muted:
-           
             if on_complete:
                 on_complete()
             return
@@ -129,26 +146,14 @@ class TTSManager:
                 on_complete()
             return
 
-        # Cache lookup
+        # Cache lookup — same text, same audio.
         if text in self.cache:
             audio = self.cache[text]
         else:
             try:
-                # Build generation kwargs — this is where voice cloning happens
-                gen_kwargs = {
-                    "text": text,
-                    "num_step": 32,
-                    "speed": 1.0,
-                }
-
-                # Pass the reference audio for voice cloning
-                if self.ref_audio and os.path.exists(self.ref_audio):
-                    gen_kwargs["ref_audio"] = self.ref_audio
-                    if self.ref_text:
-                        gen_kwargs["ref_text"] = self.ref_text
-                    # If ref_text is None, OmniVoice auto-transcribes via Whisper
-
-                audio = self.model.generate(**gen_kwargs)
+                # Pocket-TTS: generate_audio(voice_state, text) -> torch.Tensor
+                tensor = self.model.generate_audio(self.voice_state, text)
+                audio = tensor.detach().cpu().numpy().astype(np.float32).flatten()
                 self.cache[text] = audio
             except Exception as e:
                 print(f"❌ TTS generation error: {e}")
@@ -156,12 +161,7 @@ class TTSManager:
                     on_complete()
                 return
 
-        # Post-process
-        if isinstance(audio, list):
-            audio = np.array(audio)
-        if audio.ndim > 1:
-            audio = audio.flatten()
-        audio = audio.astype(np.float32)
+        # Normalize
         max_val = np.max(np.abs(audio)) if audio.size else 0.0
         if max_val > 0:
             audio = audio / max_val
@@ -186,6 +186,8 @@ class TTSManager:
             threading.Thread(target=_run, daemon=True).start()
 
     def _play_audio(self, audio):
+        """Unchanged from the OmniVoice version. Phase 4 will replace with a
+        persistent OutputStream to eliminate per-utterance device reconfig."""
         try:
             if HAS_SOUNDDEVICE:
                 try:
@@ -201,7 +203,8 @@ class TTSManager:
             time.sleep(0.1)
             system = platform.system()
             if system == "Windows":
-                subprocess.run(["start", temp_file], shell=True, check=False, capture_output=True)
+                subprocess.run(["start", temp_file], shell=True,
+                               check=False, capture_output=True)
             elif system == "Darwin":
                 subprocess.run(["open", temp_file], check=False, capture_output=True)
             else:
@@ -210,7 +213,7 @@ class TTSManager:
             print(f"❌ Playback error: {e}")
 
 
-# ===== Module-level API =====
+# ===== Module-level API (unchanged) =====
 def _get():
     return TTSManager()
 
