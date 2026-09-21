@@ -8,7 +8,7 @@ import webbrowser
 import re
 import subprocess
 import os
-
+from core.tool_descriptions import DESCRIPTIONS
 class YouTubeSession:
     """Manages YouTube search session state"""
     def __init__(self):
@@ -176,7 +176,7 @@ def _fmt_play_youtube_video(result):
 
 register(Tool(
     name="open_youtube",
-    description='Opens YouTube. Takes optional "search_query" (string).',
+    description=DESCRIPTIONS["open_youtube"],
     handler=open_youtube,
     formatter=_fmt_open_youtube,
     permission=Permission.ACTION,
@@ -185,7 +185,7 @@ register(Tool(
 
 register(Tool(
     name="search_youtube",
-    description='Searches YouTube. Takes "query" (string) and optional "max_results" (integer).',
+    description=DESCRIPTIONS["search_youtube"],
     handler=_handle_search_youtube,
     formatter=_fmt_search_youtube,
     permission=Permission.SAFE,
@@ -194,7 +194,7 @@ register(Tool(
 
 register(Tool(
     name="play_youtube_video",
-    description='Plays a video from search results. Takes "index" (integer, 1-based).',
+    description=DESCRIPTIONS["play_youtube_video"],
     handler=_handle_play_youtube_video,
     formatter=_fmt_play_youtube_video,
     permission=Permission.ACTION,

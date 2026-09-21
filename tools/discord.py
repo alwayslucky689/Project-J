@@ -6,7 +6,7 @@ from core.registry import register, Tool, Permission
 import subprocess
 import os
 from config.paths import DISCORD_EXE
-
+from core.tool_descriptions import DESCRIPTIONS
 DISCORD_PATH = DISCORD_EXE
 
 def open_discord():
@@ -33,7 +33,7 @@ def _fmt_open_discord(result):
 
 register(Tool(
     name="open_discord",
-    description="Opens the Discord desktop app. Takes no arguments.",
+    description=DESCRIPTIONS["open_discord"],
     handler=open_discord,
     formatter=_fmt_open_discord,
     permission=Permission.ACTION,

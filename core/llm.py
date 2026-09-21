@@ -12,8 +12,95 @@ from typing import Generator, Optional
 import requests
 
 from config import settings
+# ===== Needle-based routing =====
+
+import re as _re
+from core.routing import prefilter_schemas
+
+_NEEDLE_ARG_PATTERN = _re.compile(r'(optional\s+)?"([^"]+)"\s+\((\w+)[^)]*\)')
+_NEEDLE_TYPE_MAP = {
+    "string": "string",
+    "integer": "integer",
+    "boolean": "boolean",
+    "number": "number",
+    "float": "number",
+}
+
+_needle_schemas_cache: list[dict] | None = None
 
 
+def _build_all_schemas() -> list[dict]:
+    """Build the full tool schema list from the registry. Cached."""
+    global _needle_schemas_cache
+    if _needle_schemas_cache is not None:
+        return _needle_schemas_cache
+
+    from core.registry import list_tools
+    from core.tool_descriptions import DESCRIPTIONS
+
+    schemas = []
+    for t in list_tools():
+        desc = DESCRIPTIONS.get(t.name, t.description)
+        props: dict = {}
+        req: list[str] = []
+        for m in _NEEDLE_ARG_PATTERN.finditer(desc):
+            optional_flag, name, type_name = m.groups()
+            props[name] = {"type": _NEEDLE_TYPE_MAP.get(type_name, "string")}
+            if not optional_flag:
+                req.append(name)
+        params: dict = {"type": "object", "properties": props}
+        if req:
+            params["required"] = req
+        schemas.append({"name": t.name, "description": desc, "parameters": params})
+
+    _needle_schemas_cache = schemas
+    return schemas
+
+
+def route_to_tool(query: str) -> dict:
+    """
+    Route a query to a tool call using Needle + keyword prefilter.
+
+    Returns a dict in the same shape the JSON router used to produce:
+      {"tool": "play_spotify_song", "song": "...", "_confidence": 0.98}
+      {"tool": "chat", "message": query, "_confidence": 0.42}
+
+    Keys starting with "_" are metadata for logging and are stripped by
+    execute_single_action before the handler is called.
+    """
+    try:
+        import needle
+    except ImportError as e:
+        # Fall back to chat if Needle isn't installed
+        print(f"⚠️ Needle not available: {e}")
+        return {"tool": "chat", "message": query, "_error": str(e)}
+
+    schemas = _build_all_schemas()
+    filtered = prefilter_schemas(query, schemas)
+
+    try:
+        agent = needle.Needle(tools=filtered)
+        response = agent.complete(query)
+    except Exception as e:
+        return {"tool": "chat", "message": query, "_error": str(e)}
+
+    if response.get("error"):
+        return {"tool": "chat", "message": query, "_error": response["error"]}
+
+    calls = response.get("function_calls") or []
+    confidence = response.get("confidence", 0.0)
+
+    if not calls:
+        return {"tool": "chat", "message": query, "_confidence": confidence}
+
+    call = calls[0]
+    args = call.get("arguments") or {}
+    return {
+        "tool": call.get("name"),
+        **args,
+        "_confidence": confidence,
+        "_candidates": [s["name"] for s in filtered],
+    }
 class OllamaError(Exception):
     """Raised for all Ollama communication failures."""
 

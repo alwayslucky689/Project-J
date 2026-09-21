@@ -24,3 +24,4 @@ data/
 !data/.gitkeep
 OmniVoice/
 venv_stt/
+training_data/

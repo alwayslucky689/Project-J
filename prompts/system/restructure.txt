@@ -13,3 +13,6 @@ add functionality for a stronger model for strong thinking like a qwen 35b or 27
 maybe layer offloading on ram or splitting the load between my pc and laptop
 llmfit to see if it Runs
 add memory maybe something like cognee or similar?
+needle for tool calling?
+tencentdb for memoruy
+mini jev local jev for tasks/grinding something 

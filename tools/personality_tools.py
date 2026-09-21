@@ -1,7 +1,7 @@
 from core.registry import register, Tool, Permission
 # We'll pass the manager instance from assistant.py
 _personality_manager = None
-
+from core.tool_descriptions import DESCRIPTIONS
 def init_personality_tools(manager):
     global _personality_manager
     _personality_manager = manager
@@ -14,7 +14,7 @@ def change_personality(name):
     return f"❌ Personality '{name}' not found. Available: {', '.join(available)}"
 register(Tool(
     name="change_personality",
-    description='Switches the active AI personality. Takes "name" (string).',
+   description=DESCRIPTIONS["change_personality"],
     handler=change_personality,
     formatter=lambda s: s,  # returns status string already
     permission=Permission.ACTION,

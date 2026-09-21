@@ -10,7 +10,7 @@ import time
 import re
 from config import settings
 from config.paths import SPOTIFY_CACHE
-
+from core.tool_descriptions import DESCRIPTIONS
 
 class SpotifyController:
     def __init__(self):
@@ -383,13 +383,13 @@ def queue_spotify_song(song_name, artist_name=None):
     """Queue a song by name"""
     return spotify.search_and_queue_track(song_name, artist_name)
 
-def play_spotify_playlist(playlist_name):
+def play_spotify_playlist(playlist):
     """Play a playlist by name (searches your playlists + Spotify catalog)"""
-    return spotify.play_playlist_by_name(playlist_name, only_my_playlists=False)
+    return spotify.play_playlist_by_name(playlist, only_my_playlists=False)
 
-def play_my_playlist(playlist_name):
+def play_my_playlist(playlist):
     """Play a playlist from YOUR library only"""
-    return spotify.play_playlist_by_name(playlist_name, only_my_playlists=True)
+    return spotify.play_playlist_by_name(playlist, only_my_playlists=True)
 
 def list_playlists():
     """List user's playlists"""
@@ -547,7 +547,7 @@ def _fmt_lower_volume_pair(pair):
 
 register(Tool(
     name="open_spotify",
-    description="Opens Spotify in the browser. Takes no arguments.",
+    description=DESCRIPTIONS["open_spotify"],
     handler=_sp_open,
     formatter=_fmt_bool("✅ Opened Spotify", "❌ Failed to open Spotify"),
     permission=Permission.ACTION,
@@ -556,7 +556,7 @@ register(Tool(
 
 register(Tool(
     name="play_spotify_song",
-    description='Plays a song. Takes "song" (string) and optional "artist" (string).',
+    description=DESCRIPTIONS["play_spotify_song"],
     handler=_sp_play_song,
     formatter=_fmt_play_song,
     permission=Permission.ACTION,
@@ -565,7 +565,7 @@ register(Tool(
 
 register(Tool(
     name="queue_spotify_song",
-    description='Queues a song. Takes "song" (string) and optional "artist" (string).',
+    description=DESCRIPTIONS["queue_spotify_song"],
     handler=_sp_queue_song,
     formatter=_fmt_queue_song,
     permission=Permission.ACTION,
@@ -574,7 +574,7 @@ register(Tool(
 
 register(Tool(
     name="play_spotify_playlist",
-    description='Plays a playlist from Spotify\'s catalog. Takes "playlist" (string).',
+    description=DESCRIPTIONS["play_spotify_playlist"],
     handler=play_spotify_playlist,
     formatter=_fmt_play_playlist,
     permission=Permission.ACTION,
@@ -583,7 +583,7 @@ register(Tool(
 
 register(Tool(
     name="play_my_playlist",
-    description='Plays a playlist from the user\'s library. Takes "playlist" (string).',
+    description=DESCRIPTIONS["play_my_playlist"],
     handler=play_my_playlist,
     formatter=_fmt_play_playlist,
     permission=Permission.ACTION,
@@ -592,7 +592,7 @@ register(Tool(
 
 register(Tool(
     name="list_playlists",
-    description="Lists the user's Spotify playlists. Takes no arguments.",
+    description=DESCRIPTIONS["list_playlists"],
     handler=list_playlists,
     formatter=_fmt_list_playlists,
     permission=Permission.SAFE,
@@ -601,7 +601,7 @@ register(Tool(
 
 register(Tool(
     name="pause_spotify",
-    description="Pauses playback. Takes no arguments.",
+    description=DESCRIPTIONS["pause_spotify"],
     handler=pause_spotify,
     formatter=_fmt_bool("⏸️ Paused", "❌ Failed to pause"),
     permission=Permission.ACTION,
@@ -610,7 +610,7 @@ register(Tool(
 
 register(Tool(
     name="resume_spotify",
-    description="Resumes playback. Takes no arguments.",
+   description=DESCRIPTIONS["resume_spotify"],
     handler=resume_spotify,
     formatter=_fmt_bool("▶️ Resumed", "❌ Failed to resume"),
     permission=Permission.ACTION,
@@ -619,7 +619,7 @@ register(Tool(
 
 register(Tool(
     name="next_track",
-    description="Skips to the next track. Takes no arguments.",
+    description=DESCRIPTIONS["next_track"],
     handler=next_track,
     formatter=_fmt_bool("⏭️ Next track", "❌ Failed to skip"),
     permission=Permission.ACTION,
@@ -628,7 +628,7 @@ register(Tool(
 
 register(Tool(
     name="previous_track",
-    description="Goes to the previous track. Takes no arguments.",
+    description=DESCRIPTIONS["previous_track"],
     handler=previous_track,
     formatter=_fmt_bool("⏮️ Previous track", "❌ Failed to go back"),
     permission=Permission.ACTION,
@@ -637,7 +637,7 @@ register(Tool(
 
 register(Tool(
     name="set_volume",
-    description='Sets Spotify volume. Takes "volume" (integer 0-100).',
+    description=DESCRIPTIONS["set_volume"],
     handler=_sp_set_volume,
     formatter=_fmt_set_volume_pair,
     permission=Permission.ACTION,
@@ -646,7 +646,7 @@ register(Tool(
 
 register(Tool(
     name="raise_volume",
-    description='Raises Spotify volume. Takes optional "amount" (integer, default 10).',
+    description=DESCRIPTIONS["raise_volume"],
     handler=_sp_raise_volume,
     formatter=_fmt_raise_volume_pair,
     permission=Permission.ACTION,
@@ -655,7 +655,7 @@ register(Tool(
 
 register(Tool(
     name="lower_volume",
-    description='Lowers Spotify volume. Takes optional "amount" (integer, default 10).',
+    description=DESCRIPTIONS["lower_volume"],
     handler=_sp_lower_volume,
     formatter=_fmt_lower_volume_pair,
     permission=Permission.ACTION,
@@ -664,7 +664,7 @@ register(Tool(
 
 register(Tool(
     name="clear_queue",
-    description="Clears the Spotify queue. Takes no arguments.",
+    description=DESCRIPTIONS["clear_queue"],
     handler=clear_queue,
     formatter=_fmt_bool("🎵 Queue cleared", "❌ Failed to clear queue"),
     permission=Permission.ACTION,

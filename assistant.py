@@ -7,12 +7,80 @@ from tts.tts_manager import speak_async
 from config import settings
 from core.personality import PersonalityManager
 from core.prompts import build_tool_schema, COMMAND_JSON_RULES
-from core.llm import ask_ollama, ask_ollama_streaming
+from core.llm import ask_ollama, ask_ollama_streaming, route_to_tool
 from core.registry import get_tool
 from tools import youtube, spotify, discord, ollama, ookla, personality_tools, tts_tools
 from memory.fact_memory import get_facts_context, save_fact
 from audio_pipeline import AudioPipeline
 from config.paths import STT_VENV_PYTHON, STT_SERVICE_SCRIPT
+import re
+import time
+from config import settings as _settings
+
+def _ts(label: str, t0: float):
+    """Print a labeled timestamp delta if TIMING is enabled."""
+    if getattr(_settings, "TIMING", False):
+        print(f"⏱️  [{label}] {(time.perf_counter() - t0) * 1000:.0f}ms")
+
+_YOUTUBE_SEARCH = re.compile(
+    r"\bsearch\s+(?:for\s+)?(.+?)"
+    r"(?:\s+and\s+|\s+then\s+|\s+on\s+youtube\s+and\s+|$)",
+    re.I,
+)
+_YOUTUBE_REF = re.compile(
+    r"\b(?:play|show)\s+(?:the\s+)?(?:video\s+|result\s+)?"
+    r"(\d+|first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\b",
+    re.I,
+)
+
+_WORD_NUM = {
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+    "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5,
+}
+
+def _try_youtube_ref(query: str):
+    """
+    Short-circuit YouTube search + play commands.
+
+    Handles three shapes:
+      "play video 1"                       → play_youtube_video
+      "search X"                           → search_youtube
+      "search X and play video N"          → [search_youtube, play_youtube_video]
+
+    Returns a dict, a list of dicts, or None.
+    """
+    actions = []
+
+    ref_m = _YOUTUBE_REF.search(query)
+    search_m = _YOUTUBE_SEARCH.search(query)
+
+    # Only fire the search branch for bare "search X" queries (no play word)
+    if search_m and not ref_m:
+        term = search_m.group(1).strip()
+        if term:
+            return {"tool": "search_youtube", "query": term}
+
+    # Compound: search + play in the same input
+    if search_m and ref_m:
+        term = search_m.group(1).strip()
+        if term:
+            actions.append({"tool": "search_youtube", "query": term})
+
+    # Play branch (single or as second step of compound)
+    if ref_m:
+        tok = ref_m.group(1).lower()
+        if tok.isdigit():
+            idx = int(tok)
+        elif tok in _WORD_NUM:
+            idx = _WORD_NUM[tok]
+        else:
+            idx = None
+        if idx is not None:
+            actions.append({"tool": "play_youtube_video", "index": idx})
+
+    if not actions:
+        return None
+    return actions[0] if len(actions) == 1 else actions
 
 # ===== Response contract =====
 @dataclass
@@ -74,16 +142,22 @@ def route_request(user_input: str) -> AssistantResponse:
                 text=f"{personality_mgr.get_display_name()} active. How can I help?"
             )
 
-    # --- Single routing pass: tool or chat? ---
-    router_prompt = build_system_prompt(user_input)
-    decision = ask_ollama(router_prompt, is_json=True, model=settings.FAST_MODEL)
+    # --- Routing: deterministic short-circuit → Needle → llama fallback ---
+    ref = _try_youtube_ref(user_input)
+    if ref is not None:
+        result = execute_tool(ref)
+        return AssistantResponse(text=result, was_streamed=False)
+    elif settings.USE_NEEDLE_ROUTER:
+        decision = route_to_tool(user_input)
+    else:
+        router_prompt = build_system_prompt(user_input)
+        decision = ask_ollama(router_prompt, is_json=True, model=settings.FAST_MODEL)
 
-    # The router signals "not a tool call" by returning ask_question.
-    # In that case, route to the chat path with the reasoning model.
-    if not isinstance(decision, dict) or decision.get("tool") == "ask_question":
+    # The router signals "not a command" by returning 'chat'.
+    if not isinstance(decision, dict) or decision.get("tool") == "chat":
         question = user_input
         if isinstance(decision, dict):
-            question = decision.get("question") or user_input
+            question = decision.get("message") or user_input
         prompt = _build_chat_prompt(question)
         response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
         return AssistantResponse(text=response, was_streamed=True)
@@ -119,13 +193,13 @@ def execute_single_action(action):
 
     tool = get_tool(tool_name)
     if tool is None:
-        # Personality-aware unknown-tool message
         fallback = personality_mgr.render("unknown_tool")
         if fallback:
             return fallback
         return f"⚠️ Unknown tool: {tool_name}. AI said: {action}"
 
-    kwargs = {k: v for k, v in action.items() if k != "tool"}
+    kwargs = {k: v for k, v in action.items()
+              if k != "tool" and not k.startswith("_")}
 
     try:
         result = tool.handler(**kwargs)
@@ -134,8 +208,15 @@ def execute_single_action(action):
     except Exception as e:
         return f"❌ Error executing {tool_name}: {e}"
 
-    # Try personality template first — falls through to the tool's formatter
-    # if the personality doesn't define this response_key.
+    # Failure check: if the handler returned False or None, use the failure
+    # template instead of the success template. This is why "Now playing"
+    # appeared after a Spotify connection error.
+    if result is False or result is None:
+        fail = personality_mgr.render("tool_failure")
+        if fail:
+            return fail
+        return tool.format(result)
+
     rendered = personality_mgr.render(tool.response_key, **kwargs)
     if rendered is not None:
         return rendered

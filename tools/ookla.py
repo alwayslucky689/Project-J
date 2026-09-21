@@ -12,7 +12,7 @@ import webbrowser
 import threading
 import speedtest
 from datetime import datetime
-
+from core.tool_descriptions import DESCRIPTIONS
 class OoklaSpeedTest:
     def __init__(self):
         self.results = None
@@ -200,7 +200,7 @@ def _run_speed_test(background=True):
 
 register(Tool(
     name="run_speed_test",
-    description='Runs an internet speed test. Takes optional "background" (boolean, default true).',
+    description=DESCRIPTIONS["run_speed_test"],
     handler=_run_speed_test,
     formatter=lambda s: s,  # already formatted
     permission=Permission.SAFE,
@@ -209,7 +209,7 @@ register(Tool(
 
 register(Tool(
     name="quick_speed_test",
-    description="Runs a quick internet speed test. Takes no arguments.",
+    description=DESCRIPTIONS["quick_speed_test"],
     handler=quick_speed_test,
     formatter=lambda s: s,  # already formatted
     permission=Permission.SAFE,

@@ -5,7 +5,7 @@ Wraps the module-level functions in tts.tts_manager so they can be
 dispatched through the registry like any other tool.
 """
 from core.registry import register, Tool, Permission
-
+from core.tool_descriptions import DESCRIPTIONS
 from tts.tts_manager import (
     mute_tts,
     unmute_tts,
@@ -57,7 +57,7 @@ def _handle_lower_volume(amount=10):
 
 register(Tool(
     name="mute_tts",
-    description="Mutes voice output (text only). Takes no arguments.",
+    description=DESCRIPTIONS["mute_tts"],
     handler=_handle_mute,
     formatter=lambda s: s,
     permission=Permission.SAFE,
@@ -66,7 +66,7 @@ register(Tool(
 
 register(Tool(
     name="unmute_tts",
-    description="Enables voice output. Takes no arguments.",
+    description=DESCRIPTIONS["unmute_tts"],
     handler=_handle_unmute,
     formatter=lambda s: s,
     permission=Permission.SAFE,
@@ -75,7 +75,7 @@ register(Tool(
 
 register(Tool(
     name="toggle_tts",
-    description="Toggles voice output on/off. Takes no arguments.",
+    description=DESCRIPTIONS["toggle_tts"],
     handler=_handle_toggle,
     formatter=lambda s: s,
     permission=Permission.SAFE,
@@ -84,7 +84,7 @@ register(Tool(
 
 register(Tool(
     name="set_tts_volume",
-    description='Sets TTS volume. Takes "volume" (integer 0-100).',
+    description=DESCRIPTIONS["set_tts_volume"],
     handler=_handle_set_volume,
     formatter=lambda s: s,
     permission=Permission.SAFE,
@@ -93,7 +93,7 @@ register(Tool(
 
 register(Tool(
     name="raise_tts_volume",
-    description='Raises TTS volume. Takes optional "amount" (integer, default 10).',
+    description=DESCRIPTIONS["raise_tts_volume"],
     handler=_handle_raise_volume,
     formatter=lambda s: s,
     permission=Permission.SAFE,
@@ -102,7 +102,7 @@ register(Tool(
 
 register(Tool(
     name="lower_tts_volume",
-    description='Lowers TTS volume. Takes optional "amount" (integer, default 10).',
+    description=DESCRIPTIONS["lower_tts_volume"],
     handler=_handle_lower_volume,
     formatter=lambda s: s,
     permission=Permission.SAFE,
