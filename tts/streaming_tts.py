@@ -14,7 +14,7 @@ import re
 import threading
 import queue
 import time
-
+from tts.tts_manager import generate_chunk_for_streaming, play_chunk_blocking
 
 _SENTINEL = object()
 _SENTENCE_END = re.compile(r'[.!?]+(?=\s|$)')
@@ -37,6 +37,8 @@ class StreamingTTS:
 
     def start(self):
         """Spawn the two background workers."""
+        import time
+        self._t0=time.perf_counter()
         self._synth_thread = threading.Thread(
             target=self._synth_loop, daemon=True, name="tts-synth"
         )
@@ -56,29 +58,25 @@ class StreamingTTS:
             self.text_queue.put(chunk)
 
     def finish(self):
-        """Flush remaining text, wait for all audio to finish playing."""
         if self._stopped:
             return
 
-        # Flush whatever's left in the buffer
         leftover = self.text_buffer.strip()
         if leftover:
             self.text_queue.put(leftover)
         self.text_buffer = ""
 
-        # Signal synth thread to stop
         self.text_queue.put(_SENTINEL)
         if self._synth_thread:
             self._synth_thread.join()
 
-        # Signal player thread to stop
         self.audio_queue.put(_SENTINEL)
         if self._player_thread:
             self._player_thread.join()
 
-        # Let the hardware buffer drain (pygame reports "not busy" before
-        # the speaker has physically finished emitting the last sample)
-        time.sleep(0.25)
+        # Final drain — make sure the last sentence's audio has fully played.
+        from tts.playback import get_player
+        get_player().wait_until_idle()
 
         self._stopped = True
 
@@ -115,29 +113,33 @@ class StreamingTTS:
     # ============ Internal — Worker Threads ============
 
     def _synth_loop(self):
-        """Pull sentences, synthesize to audio, push to audio_queue."""
         from tts.tts_manager import generate_chunk_for_streaming
-
         while True:
             sentence = self.text_queue.get()
             if sentence is _SENTINEL:
                 break
             try:
-                audio = generate_chunk_for_streaming(sentence)
-                if audio is not None and len(audio) > 0:
+                for audio in generate_chunk_for_streaming(sentence):
                     self.audio_queue.put(audio)
+                self.audio_queue.put(_SENTENCE_END)
             except Exception as e:
                 print(f"⚠️ [streaming_tts] synth error: {e}")
-
     def _player_loop(self):
-        """Pull audio arrays, play them sequentially."""
-        from tts.tts_manager import play_chunk_blocking
+        from tts.tts_manager import play_chunk
+        from tts.playback import get_player
+        from config import settings
+        import time
 
         while True:
-            audio = self.audio_queue.get()
-            if audio is _SENTINEL:
+            item = self.audio_queue.get()
+            if item is _SENTINEL:
                 break
-            try:
-                play_chunk_blocking(audio)
-            except Exception as e:
-                print(f"⚠️ [streaming_tts] playback error: {e}")
+            if item is _SENTENCE_END:
+                get_player().wait_until_idle()
+                continue
+            if (getattr(settings, "TIMING", False)
+                    and not getattr(self, "_first_play_logged", False)):
+                self._first_play_logged = True
+                elapsed = time.perf_counter() - getattr(self, "_t0", time.perf_counter())
+                print(f"   [streaming] first chunk playback start: {elapsed:.2f}s")
+            play_chunk(item)

@@ -168,11 +168,22 @@ class AudioPipeline:
         raise TimeoutError("STT service didn't become ready within 90s")
 
     def _drain_stderr(self):
-        """Read stderr lines from STT service and print them (for debugging)."""
+        """
+        Read stderr from the STT subprocess. Surface our own [stt_service]
+        logs and any line that looks like an error. Drop NeMo/Lhotse noise
+        that slips past logger silencing.
+        """
         try:
             for line in self.stt_proc.stderr:
                 line = line.rstrip()
-                if line:
+                if not line:
+                    continue
+                if line.startswith("[stt_service]"):
+                    print(line)
+                    continue
+                lowered = line.lower()
+                if any(k in lowered for k in
+                    ("error", "fatal", "traceback", "exception", "failed")):
                     print(f"[stt] {line}")
         except Exception:
             pass

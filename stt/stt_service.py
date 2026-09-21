@@ -1,31 +1,25 @@
-# stt_service.py - Persistent Parakeet transcription service
-#
-# Reads WAV file paths from stdin (one per line).
-# Writes the transcription to stdout (one line per input).
-#
-# Run this from inside venv_stt:
-#   python stt_service.py
-#
-# The main assistant launches this as a subprocess and talks to it via pipes.
-
 import sys
 import os
 import time
 
-# Suppress NeMo's noisy logging
+# Silence NeMo/Lhotse *before* anything imports them.
 os.environ["NEMO_LOG_LEVEL"] = "ERROR"
 os.environ["HYDRA_FULL_ERROR"] = "0"
+# Disables NeMo's transcribe() tqdm progress bar globally.
+os.environ["TQDM_DISABLE"] = "1"
 
-# Quiet down other loggers
 import logging
-logging.getLogger("nemo_logger").setLevel(logging.ERROR)
-logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
-logging.getLogger("lightning").setLevel(logging.ERROR)
-
 import warnings
+
+# NeMo's custom logger hierarchy doesn't always respect NEMO_LOG_LEVEL,
+# and Lhotse (a NeMo dependency) prints dataloader warnings at WARN level.
+for _name in (
+    "nemo", "nemo_logger", "nemo.collections", "nemo.core",
+    "lhotse", "pytorch_lightning", "lightning", "hydra",
+):
+    logging.getLogger(_name).setLevel(logging.ERROR)
+
 warnings.filterwarnings("ignore")
-
-
 def log(msg):
     """Print to stderr (safe — doesn't interfere with stdout protocol)."""
     print(msg, file=sys.stderr, flush=True)
@@ -75,7 +69,7 @@ def main():
         
         try:
             t0 = time.time()
-            output = model.transcribe([path])
+            output = model.transcribe([path], verbose=False)    
             text = output[0].text.strip()
             elapsed = time.time() - t0
             log(f"[stt_service] Transcribed in {elapsed:.2f}s: {text!r}")

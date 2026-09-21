@@ -3,7 +3,9 @@
 # Phase 5: TTS runs entirely on CPU. Zero VRAM cost, no stutter.
 # Public API is unchanged from the OmniVoice version — nothing outside
 # this file needs to know the engine changed.
-
+import torch as _torch
+_torch.set_num_threads(3)
+_torch.set_num_interop_threads(1)
 import os
 import time
 import threading
@@ -78,6 +80,8 @@ class TTSManager:
                 self.voice_state = self._load_voice_state(export_model_state)
 
                 print(f"✅ Pocket-TTS ready (sample rate {self.sample_rate}).")
+                from tts.playback import get_player
+                get_player(sample_rate=self.sample_rate).start()
                 return True
             except Exception as e:
                 print(f"❌ Failed to load Pocket-TTS: {e}")
@@ -186,37 +190,21 @@ class TTSManager:
             threading.Thread(target=_run, daemon=True).start()
 
     def _play_audio(self, audio):
-        """Unchanged from the OmniVoice version. Phase 4 will replace with a
-        persistent OutputStream to eliminate per-utterance device reconfig."""
+        """
+        Queue audio to the persistent playback stream and block until it has
+        finished playing. Phase 4: replaces the old sd.play() + sd.wait()
+        which opened/closed the device on every utterance.
+        """
         try:
-            if HAS_SOUNDDEVICE:
-                try:
-                    sd.play(audio, self.sample_rate)
-                    sd.wait()
-                    return
-                except Exception as e:
-                    print(f"❌ sounddevice playback error: {e}")
-
-            import soundfile as sf
-            temp_file = "tts_output.wav"
-            sf.write(temp_file, audio, self.sample_rate)
-            time.sleep(0.1)
-            system = platform.system()
-            if system == "Windows":
-                subprocess.run(["start", temp_file], shell=True,
-                               check=False, capture_output=True)
-            elif system == "Darwin":
-                subprocess.run(["open", temp_file], check=False, capture_output=True)
-            else:
-                subprocess.run(["xdg-open", temp_file], check=False, capture_output=True)
+            from tts.playback import get_player
+            player = get_player(sample_rate=self.sample_rate)
+            player.play_and_wait(audio, timeout=120.0)
         except Exception as e:
             print(f"❌ Playback error: {e}")
-
-
+    
 # ===== Module-level API (unchanged) =====
 def _get():
     return TTSManager()
-
 
 def speak(text, voice=None, block=False, on_complete=None):
     _get().speak(text, voice=voice, block=block, on_complete=on_complete)
@@ -248,3 +236,52 @@ def set_tts_volume(volume):
 
 def get_tts_volume():
     return _get().get_volume()
+# ===== Streaming TTS support (Phase 3a) =====
+
+def generate_chunk_for_streaming(text: str):
+    """
+    Yield audio chunks from Pocket-TTS native streaming.
+
+    Each chunk is ~80ms (1920 samples at 24kHz). First chunk arrives
+    ~200ms after generation starts, instead of waiting for the full
+    sentence to synthesize.
+    """
+    if not text or len(text.strip()) == 0:
+        return
+
+    mgr = _get()
+    if mgr.muted:
+        return
+    if not mgr._ensure_model():
+        return
+
+    try:
+        for chunk in mgr.model.generate_audio_stream(mgr.voice_state, text):
+            audio = chunk.detach().cpu().numpy().astype(np.float32).flatten()
+            if audio.size == 0:
+                continue
+            audio = np.clip(audio, -1.0, 1.0)
+            if mgr.volume < 100:
+                audio = audio * (mgr.volume / 100.0)
+            yield audio
+    except Exception as e:
+        print(f"⚠️ [tts] chunk synthesis failed for {text!r}: {e}")
+
+
+def play_chunk_blocking(audio):
+    """Play a pre-synthesized chunk through the persistent player, blocking."""
+    if audio is None or len(audio) == 0:
+        return
+
+    from tts.playback import get_player
+    mgr = _get()
+    player = get_player(sample_rate=mgr.sample_rate)
+    player.play_and_wait(audio, timeout=60.0)
+def play_chunk(audio):
+    """Queue a single audio chunk to the persistent player (non-blocking)."""
+    if audio is None or len(audio) == 0:
+        return
+    from tts.playback import get_player
+    mgr = _get()
+    player = get_player(sample_rate=mgr.sample_rate)
+    player.play(audio)

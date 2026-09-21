@@ -174,7 +174,31 @@ def ask_ollama(prompt_text: str, is_json: bool = False, model: Optional[str] = N
 
     return text
 
+def ask_ollama_streaming(
+    prompt_text: str,
+    model: Optional[str] = None,
+    on_token=None,
+) -> str:
+    """
+    Print tokens to stdout as they arrive, return the full text.
 
+    If `on_token` is provided, it is called once per token with that token
+    string. Used by the streaming TTS path to feed a StreamingTTS instance
+    without changing this function's primary contract.
+    """
+    print("🤖 ", end="", flush=True)
+    full = ""
+    for token in stream_tokens(prompt_text, model=model):
+        print(token, end="", flush=True)
+        if on_token is not None:
+            try:
+                on_token(token)
+            except Exception as e:
+                print(f"\n⚠️ on_token error: {e}")
+        full += token
+    if full:
+        print()
+    return full.strip()
 def stream_tokens(prompt_text: str, model: Optional[str] = None) -> Generator[str, None, None]:
     """
     Yield tokens as they arrive over HTTP.
@@ -213,22 +237,3 @@ def stream_tokens(prompt_text: str, model: Optional[str] = None) -> Generator[st
     finally:
         response.close()
 
-
-def ask_ollama_streaming(prompt_text: str, model: Optional[str] = None) -> str:
-    """
-    Print tokens to stdout as they arrive, return the full text.
-
-    Contract preserved from the old subprocess-based version:
-    - Prints "🤖 " prefix once
-    - Prints tokens without newlines as they arrive
-    - Prints a trailing newline if anything was emitted
-    - Returns the stripped full text
-    """
-    print("🤖 ", end="", flush=True)
-    full = ""
-    for token in stream_tokens(prompt_text, model=model):
-        print(token, end="", flush=True)
-        full += token
-    if full:
-        print()
-    return full.strip()

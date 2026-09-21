@@ -35,7 +35,7 @@ for _d in (DATA_DIR, TEMP_DIR, SESSIONS_DIR, VOICES_DIR, LOGS_DIR):
 
 # ===== Specific files =====
 WAKEWORD_MODEL_PATH = WAKEWORD_DIR / "jarvis_robust_final" / "jarvis_robust.onnx"
-JARVIS_VOICE_SAMPLE = SYSTEM_PROMPTS / "jarvis_sample.wav"
+JARVIS_VOICE_SAMPLE = SYSTEM_PROMPTS / "jarvis_sample_2.wav"
 SPOTIFY_CACHE       = PROJECT_ROOT / ".spotify_cache"
 FACTS_FILE          = DATA_DIR / "facts.json"   # becomes facts.db in Phase 6
 STT_UTTERANCE_WAV   = TEMP_DIR / "utterance.wav"

@@ -15,3 +15,4 @@ remove this [stt] [NeMo W 2026-09-21 13:40:54 dataloader:881] The following conf
 [stt] Transcribing: 1it [00:00,  2.35it/s]
 
 clean up the text shown
+clean up jarvis sample file and maybe include more audio if beneficial

@@ -16,6 +16,7 @@ from config.paths import STT_VENV_PYTHON, STT_SERVICE_SCRIPT
 import re
 import time
 from config import settings as _settings
+from tts.tts_manager import generate_chunk_for_streaming, play_chunk_blocking
 
 def _ts(label: str, t0: float):
     """Print a labeled timestamp delta if TIMING is enabled."""
@@ -88,6 +89,7 @@ class AssistantResponse:
     text: str = ""
     was_streamed: bool = False   # True if already printed during streaming
     speak: bool = True           # Whether the caller should TTS this
+    was_spoken: bool = False
 
 
 # ===== Initialization =====
@@ -155,12 +157,12 @@ def route_request(user_input: str) -> AssistantResponse:
         question = user_input
         if isinstance(decision, dict):
             question = decision.get("message") or user_input
-        prompt = _build_chat_prompt(question)
-        t_llm = time.perf_counter()
-        response = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
-        _ts("chat first-token-to-end", t_llm)
-        _ts("total", t0)
-        return AssistantResponse(text=response, was_streamed=True)
+        response, spoken = _handle_chat_streaming(question)
+        return AssistantResponse(
+            text=response,
+            was_streamed=True,
+            was_spoken=spoken,
+        )
 
     t_tool = time.perf_counter()
     result = execute_tool(decision)
@@ -228,16 +230,30 @@ def handle_response(response: AssistantResponse):
     """Single place that prints (if needed) and speaks a response."""
     if response.text and not response.was_streamed:
         print(f"🤖 {response.text}")
-    if settings.ENABLE_TTS and response.speak and response.text:
+    if (
+        settings.ENABLE_TTS
+        and response.speak
+        and response.text
+        and not response.was_spoken
+    ):
         _speak_safe(response.text)
 
-
+_EXIT_PHRASES = {
+    "quit", "exit", "shut down", "shutdown",
+    "goodbye", "good bye", "bye", "shut up"
+}
 # ===== Voice Callback =====
 def on_transcription(text):
     """Called by audio_pipeline with recognized speech."""
-    print(f"\n🗣️  Processing: {text}")
+    print(f"\n  Processing: {text}")
 
-    # Block the mic for the entire request + TTS lifecycle
+    if text.strip().lower().rstrip(".!?") in _EXIT_PHRASES:
+        print("👋 Goodbye!")
+        if settings.ENABLE_TTS:
+            _speak_safe("Goodbye, Sir.")
+        import os
+        os._exit(0)
+
     if audio_pipeline:
         audio_pipeline.set_speaking(True)
     try:
@@ -247,7 +263,41 @@ def on_transcription(text):
         if audio_pipeline:
             audio_pipeline.set_speaking(False)
 
+def _handle_chat_streaming(question: str) -> tuple[str, bool]:
+    """
+    Chat path with streaming TTS.
 
+    Streams LLM tokens into a StreamingTTS instance so playback starts at
+    the first sentence boundary. Returns (full_text, was_spoken).
+
+    Falls back to plain streaming (no TTS) when TTS is muted or disabled.
+    """
+    prompt = _build_chat_prompt(question)
+
+    # Skip streaming TTS entirely if it wouldn't speak anyway.
+    from tts.tts_manager import is_muted
+    tts_active = settings.ENABLE_TTS and not is_muted()
+
+    if not tts_active:
+        full = ask_ollama_streaming(prompt, model=settings.REASONING_MODEL)
+        return full, False
+
+    from tts.streaming_tts import StreamingTTS
+
+    streamer = StreamingTTS()
+    streamer.start()
+
+    try:
+        full = ask_ollama_streaming(
+            prompt,
+            model=settings.REASONING_MODEL,
+            on_token=streamer.push_token,
+        )
+    finally:
+        # Blocks until every queued sentence has been synthesized AND played.
+        streamer.finish()
+
+    return full, True
 # ===== Main =====
 def main():
     global audio_pipeline
