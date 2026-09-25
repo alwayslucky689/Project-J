@@ -32,7 +32,7 @@ PERSONALITIES_DIR = PROJECT_ROOT / "personalities"
 # Create writable dirs on import
 for _d in (DATA_DIR, TEMP_DIR, SESSIONS_DIR, VOICES_DIR, LOGS_DIR):
     _d.mkdir(parents=True, exist_ok=True)
-
+MEMORY_DB           = DATA_DIR / "memory.db"
 # ===== Specific files =====
 WAKEWORD_MODEL_PATH = WAKEWORD_DIR / "jarvis_robust_final" / "jarvis_robust.onnx"
 JARVIS_VOICE_SAMPLE = SYSTEM_PROMPTS / "jarvis_sample_2.wav"

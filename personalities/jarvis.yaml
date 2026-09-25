@@ -71,7 +71,8 @@ responses:
   fact_saved: "Noted, Sir."
   personality_switched: "Switching now, Sir."
   asked_question: "{answer}"
-
+  fact_deleted: "Forgotten, Sir."
+  facts_listed: "{result}"
   tts_muted: "Voice muted, Sir."
   tts_unmuted: "Voice restored, Sir."
   tts_toggled: "Voice toggled, Sir."

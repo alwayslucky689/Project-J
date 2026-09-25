@@ -26,3 +26,7 @@ OmniVoice/
 venv_stt/
 training_data/
 venv_pocket_tts/
+scripts/
+*.txt
+.txt
+fix.txt

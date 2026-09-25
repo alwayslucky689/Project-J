@@ -1,18 +1,2 @@
-fix tts output garbage
-fix wake word detecting fantom words
-fix mic too low volume/detection
-fix stt picking up a little too much
-fix not being able to quit with voice commands
 fix parakeet loading time
-FIX NEEDLE QUERIES
-IMPLEMENT NEEDLE FULLY
-REDO IN ANOTHER PROMPT
-CONTINUE PLAN PHASE 3
-remove this [stt] [NeMo W 2026-09-21 13:40:54 dataloader:881] The following configuration keys are ignored by Lhotse dataloader: use_start_end_token
-[stt] [NeMo W 2026-09-21 13:40:55 dataloader:533] You are using a non-tarred dataset and requested tokenization during data sampling (pretokenize=True). This will cause the tokenization to happen in the main (GPU) process,possibly impacting the training speed if your tokenizer is very large.If the impact is noticable, set pretokenize=False in dataloader config.(note: that will disable token-per-second filtering and 2D bucketing features)
-[stt] Transcribing: 0it [00:00, ?it/s]
-[stt] Transcribing: 1it [00:00,  2.36it/s]
-[stt] Transcribing: 1it [00:00,  2.35it/s]
-
-clean up the text shown
-clean up jarvis sample file and maybe include more audio if beneficial
+add logging for sessions for debugging

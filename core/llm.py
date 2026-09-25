@@ -236,4 +236,68 @@ def stream_tokens(prompt_text: str, model: Optional[str] = None) -> Generator[st
                 yield token
     finally:
         response.close()
+# ===== Chat endpoint (multi-turn conversation) =====
 
+def _post_chat(payload: dict, timeout, stream: bool = False) -> requests.Response:
+    """POST to Ollama's /api/chat endpoint."""
+    url = settings.OLLAMA_URL.replace("/api/generate", "/api/chat")
+    try:
+        r = requests.post(url, json=payload, timeout=timeout, stream=stream)
+    except requests.exceptions.ConnectionError as e:
+        raise OllamaError(f"Cannot connect to Ollama: {e}") from e
+    except requests.exceptions.Timeout as e:
+        raise OllamaError(f"Ollama timed out: {e}") from e
+    except requests.exceptions.RequestException as e:
+        raise OllamaError(f"Ollama request failed: {e}") from e
+
+    if r.status_code != 200:
+        raise OllamaError(f"Ollama returned HTTP {r.status_code}")
+    return r
+
+
+def chat_stream_tokens(messages: list[dict],
+                       model: Optional[str] = None) -> Generator[str, None, None]:
+    """Stream tokens from /api/chat. messages is a list of {role, content}."""
+    model = model or settings.REASONING_MODEL
+    payload = {"model": model, "messages": messages, "stream": True}
+
+    try:
+        response = _post_chat(payload, timeout=(10, 180), stream=True)
+    except OllamaError as e:
+        print(f"\n❌ {e}")
+        return
+
+    try:
+        for raw in response.iter_lines(decode_unicode=False):
+            if not raw:
+                continue
+            try:
+                chunk = json.loads(raw.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            if chunk.get("done"):
+                break
+            token = (chunk.get("message") or {}).get("content", "")
+            if token:
+                yield token
+    finally:
+        response.close()
+
+
+def chat_streaming(messages: list[dict],
+                   model: Optional[str] = None,
+                   on_token=None) -> str:
+    """Stream a chat completion, printing tokens and returning the full text."""
+    print("🤖 ", end="", flush=True)
+    full = ""
+    for token in chat_stream_tokens(messages, model=model):
+        print(token, end="", flush=True)
+        if on_token is not None:
+            try:
+                on_token(token)
+            except Exception as e:
+                print(f"\n⚠️ on_token error: {e}")
+        full += token
+    if full:
+        print()
+    return full.strip()

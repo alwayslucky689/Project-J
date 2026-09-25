@@ -1,0 +1,4 @@
+add 64x64 led grid display to ai 
+add a 3d rendered display to ai or to music/challenges
+mousiki or something similar music player for terminal or app through jarvis
+
