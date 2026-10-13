@@ -187,19 +187,43 @@ def _migration_007_topic_fields(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_topics_user_active
             ON topics(user_id, status, last_active_at DESC);
     """)
-
 def _migration_008_topic_scope_index(conn: sqlite3.Connection):
     """Index for retrieving facts by scope_topic_id."""
     conn.executescript("""
         CREATE INDEX IF NOT EXISTS idx_facts_topic_scope
             ON facts(scope_topic_id, status);
     """)
+def _migration_009_topic_state(conn: sqlite3.Connection):
+    """Structured topic state.
 
+    Replaces the free-text topics.summary as the primary topic memory with
+    a JSON object of the form:
+        {
+          "objective":         str,
+          "active_decisions":  [str, ...],
+          "open_questions":    [str, ...],
+          "updated_at":        ISO8601 str
+        }
 
+    topics.summary is retained as a display fallback but is no longer
+    written by the merge path (see memory/topic_state.py).
+    """
+    conn.executescript("""
+        ALTER TABLE topics ADD COLUMN state TEXT;
+    """)
 MIGRATIONS = [
-    # ... existing migrations 1-7 ...
+    (1, "initial_schema", _migration_001_initial_schema),
+    (2, "embeddings", _migration_002_embeddings),
+    (3, "cosine_metric", _migration_003_cosine_metric),
+    (4, "bge_small", _migration_004_bge_small),
+    (5, "session_context", _migration_005_session_context),
+    (6, "pinned_facts", _migration_006_pinned_facts),
+    (7, "topic_fields", _migration_007_topic_fields),
     (8, "topic_scope_index", _migration_008_topic_scope_index),
+    (9, "topic_state", _migration_009_topic_state),
 ]
+
+
 
 
 

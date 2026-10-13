@@ -82,7 +82,19 @@ class PersistentPlayer:
         self._completion_thread.start()
 
     # ---------- Public API ----------
-
+    def flush(self):
+        """Drop everything queued. The currently-playing chunk is also
+        dropped — audio stops mid-sample. Used by cancellation."""
+        # Clear queued chunks
+        while True:
+            try: self._chunks.get_nowait()
+            except queue.Empty: break
+        # Clear the currently-playing chunk
+        self._current = None
+        self._current_id = None
+        self._offset = 0
+        self._tail_frames_remaining = 0
+        self._tail_chunk_id = None
     def start(self):
         """Open the OutputStream. Idempotent."""
         if self._stream is not None or not HAS_SOUNDDEVICE:

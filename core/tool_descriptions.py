@@ -17,7 +17,13 @@ survive; explicit "NOT for X — use Y" instruction does.
 DESCRIPTIONS = {
 
     # ===== YouTube =====
-
+    "search_memory": (
+        "Searches the user's long-term memory for facts and past "
+        "conversations. Use for 'what did I say about X', 'do you remember Y', "
+        "'what do you know about me'. NOT for general knowledge questions — "
+        "use chat for those. "
+        'Takes "query" (string).'
+    ),
     "open_youtube": (
         "Opens YouTube in the browser. Use for 'open youtube', 'go to "
         "youtube'. Optional 'search_query' pre-fills a search box only if "

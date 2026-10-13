@@ -7,7 +7,7 @@
 #
 # For 6i: retrieval is still global. Topic scoping of facts and sessions
 # lands in 6j.
-
+from memory.topic_state import parse_state
 import json
 import re
 from datetime import datetime
@@ -245,7 +245,6 @@ def _find_by_normalized(normalized: str,
 
 def _row_to_dict(row) -> dict:
     d = dict(row)
-    # Parse aliases into a list for convenience
     if d.get("aliases"):
         try:
             d["aliases"] = json.loads(d["aliases"])
@@ -253,6 +252,9 @@ def _row_to_dict(row) -> dict:
             d["aliases"] = []
     else:
         d["aliases"] = []
+    # Phase 6k: structured state comes back as parsed dict.
+    if "state" in d:
+        d["state"] = parse_state(d["state"])
     return d
 
 

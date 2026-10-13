@@ -373,3 +373,9 @@ def get_unprocessed_turns(limit: int = 50) -> list[dict]:
         (last_id, limit),
     ).fetchall()
     return [dict(r) for r in rows]
+def get_session_context(session_id: int) -> Optional[str]:
+    """Return the context string for a session ('global' or 'topic:<id>')."""
+    row = get_conn().execute(
+        "SELECT context FROM sessions WHERE id = ?", (session_id,)
+    ).fetchone()
+    return row["context"] if row else None

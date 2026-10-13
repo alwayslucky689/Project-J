@@ -13,6 +13,7 @@ from tools import ookla            # noqa: F401
 from tools import ollama           # noqa: F401
 from tools import personality_tools  # noqa: F401
 from tools import tts_tools        # noqa: F401
+from tools import memory_tools     # noqa: F401
 
 # Registers remember_fact from the memory package
 import memory.fact_memory          # noqa: F401

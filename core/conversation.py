@@ -81,13 +81,13 @@ class ConversationManager:
             result.append({"role": "user", "content": current_user_input})
 
             try:
-                from memory.retrieval import assemble_memory
+                from memory.retrieval import baseline_memory
                 from memory.inject import inject_into_messages
-                records = assemble_memory(current_user_input, session_id)
+                records = baseline_memory(session_id)
                 if records:
                     result = inject_into_messages(result, records)
             except Exception as e:
-                print(f"⚠️ Memory assembly failed: {e}")
+                print(f"⚠️ Baseline memory assembly failed: {e}")
 
         return result
 

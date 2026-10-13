@@ -89,8 +89,28 @@ class _Worker:
                 summary = summarize_session(sid)
                 if summary:
                     _log(f"📝 Summarized session {sid}: {summary[:60]}...")
+                    self._merge_topic_state(sid, summary)
             except Exception as e:
                 _log(f"⚠️ Summary failed for session {sid}: {e}")
+
+    def _merge_topic_state(self, session_id: int, session_summary: str):
+        """If the session belonged to a topic, fold its summary into the
+        topic's structured state. No-op for global sessions."""
+        from memory.sessions import get_session_context
+        ctx = get_session_context(session_id)
+        if not ctx or not ctx.startswith("topic:"):
+            return
+        try:
+            topic_id = int(ctx.split(":", 1)[1])
+        except (ValueError, IndexError):
+            return
+        try:
+            from memory.topic_state import merge_session_into_state
+            new_state = merge_session_into_state(topic_id, session_summary)
+            if new_state is not None:
+                _log(f"🧩 Topic {topic_id} state updated.")
+        except Exception as e:
+            _log(f"⚠️ Topic state merge failed for topic {topic_id}: {e}")
 
     def _should_run(self) -> bool:
         checkpoint = _load_checkpoint()

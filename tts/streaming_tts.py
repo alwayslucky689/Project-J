@@ -34,7 +34,33 @@ class StreamingTTS:
         self._stopped = False
 
     # ============ Public API ============
+    def stop(self):
+        """
+        Cancel playback immediately. Drains queues and tells the
+        persistent player to flush. Called by the cancel token.
+        Safe to call from any thread.
+        """
+        if self._stopped:
+            return
 
+        # Drain text and audio queues so workers exit without synthesizing
+        for q in (self.text_queue, self.audio_queue):
+            while True:
+                try: q.get_nowait()
+                except queue.Empty: break
+
+        # Tell the playback layer to drop anything queued
+        try:
+            from tts.playback import get_player
+            get_player().flush()
+        except Exception as e:
+            print(f"⚠️ [tts] flush failed: {e}")
+
+        # Signal workers to stop
+        self.text_queue.put(_SENTINEL)
+        self.audio_queue.put(_SENTINEL)
+
+        self._stopped = True
     def start(self):
         """Spawn the two background workers."""
         import time

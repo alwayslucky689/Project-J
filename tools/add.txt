@@ -1,12 +1,37 @@
 read file
 write file
 edit file
-run bash command
-maybe implement in c or c++ for faster 
-c++ in android
+run bash commands and use powershell
+find or create a calender, and make the ai able to use/edit the calender add events etc, the calender needs to also be able to be used on phone as well
 add google maps functionality with directions/bus
 add travana next bus check
 feynman for checking studies
-nvidia personal ai router
-ashna.ai for online models
-tokenharbour for online models
+nvidia personal ai router so i can use my laptop as processing power for a stronger llm if i want to
+database backup system(maybe overkill?)
+ashna.ai or similar for online api models
+tokenharbour or similar for free api models
+Integrate some sort of download manager such as motrix https://github.com/agalwood/motrix for both just downloading stuff more clean off firefox
+and for my ai assistant to use.
+Some sort of automatic youtube video download through the agent, and video cropping, be that the youtube video i wanna download, or a local video
+Save that file to **** command
+Something for my assistant to easier control my pc and do taks on it such as https://github.com/trycua/cua or something else open source
+A gui program that will contain: A list of chats aka the stored topics, a general chat just for anything including adding files and click to speak,
+a voice like visualizer for when jarvis is speaking, small performance tab for my pc, small weather and info tab, music section etc, visualization of projects aka where my local llm connects to cloud ones for projects and each of their chat/history etc how they work together
+A little mini program that will be horizontal on the top of the monitor, it will be always on top, and will be active when the gui is minimized, it will have a little animated dude that will show what my agent is doing(sleeping,listening,talking,working etc) and maybe show a little bit of text/stats/rekevant data etc. something like https://github.com/louis-cfm/coucou and 
+A system/tool/schema for how to create a workflow of agents, where my local one will be just the orchestrator, when i ask it it will create it, maybe ask a better llm for a good breakdown or just hardwire it, it will assign roles to the llms involved, give them the sufficient information and give them a task, then they will feed back the answers into it or it will feed into something else, and in the end(or when theres a question/confusion) it will come back to models
+Maybe - https://github.com/dzhng/jevgrep check it out supposed to be a tool to help agents navigate folders etc idk if its free
+Maybe - if possible improve spotify handling to where it doesnt need to actually open spotify etc it can just execute it in the background. And also if possible to integrate spotify into a custom music player(which will live in the gui) similar to https://github.com/itzender5820/mousiki  
+For fun - make the ai play a song on 00:00 on the 1st of each month(if its on at that time)
+Check - qwen 3.5/3.8 and abliterated models 8-9B(are they better than llama 8b)
+LLM optimization tools such as https://github.com/Edge0-AI/edge0 or https://github.com/ryancodrai/turbovec or https://github.com/vllm-project/vllm or https://github.com/NVIDIA/Model-Optimizer or a mix of the above.
+real time search engine such as https://github.com/anysearch-ai or similar so my llm has actual uptodate info (would i need to fine tune some weights so it realizes for example its sample data isnt the only thing that exists?)
+Interesting - https://github.com/netease-youdao/qanything a tool that should in theory help the ai assistant recieve and understand files i attach to it
+https://github.com/Tencent/BrowserSkill or similar alternative - actual browser control api(should help not having to write hardcoded tools for each website), also check out https://browser-use.com/ https://www.webbrain.one/ https://github.com/browser-use/browser-harness
+https://www.instagram.com/p/DdmZKtJFCoe/ tool that should help with creating a system of subagent llms(for projects and such as mentioned earlier)
+also check out https://github.com/mvschwarz/openrig for multi agent harness could be useful
+chttps://github.com/derv82/wifit3 better wifi/speed auditor tool
+https://github.com/alibaba/open-code-review tool that helps actually review code efficiently
+allowing my agent(and group of subagents) to make their own test environment and actually edit the changes onto the files and run their tests and fetch the results by themselves etc
+Interesting https://github.com/jaredpalmer/kev mix of jev(no talking decision ai model) and qwen, could be useful for something
+Inquire about global interpreter lock- is it something to think about, could it be throttling my performance, what would be gained from using free threaded such as python 3.14 or an alternative for 3.12
+9Drive - https://github.com/zenhosta/9drive just cloud storage tool that connects google drive accounts for efficient storage

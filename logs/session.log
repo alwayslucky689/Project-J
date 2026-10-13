@@ -1,0 +1,53 @@
+[21:52:27.698] SESSION: 62 started
+[21:52:27.727] GPU monitor: pynvml
+[21:52:32.730] GPU: vram=7814/8192MB util=27%
+[21:52:37.736] GPU: vram=7809/8192MB util=0%
+[21:52:42.743] GPU: vram=7844/8192MB util=2%
+[21:52:47.748] GPU: vram=7844/8192MB util=0%
+[21:52:52.755] GPU: vram=7844/8192MB util=0%
+[21:52:57.769] GPU: vram=7824/8192MB util=0%
+[21:53:02.421] ────: ────────────────────────────────────────────────────────────
+[21:53:02.421] USER: Tell me about Moist Critical.
+[21:53:02.792] GPU: vram=7900/8192MB util=2%
+[21:53:03.036] ROUTE: → chat (615ms, conf=0.98, candidates=['chat'])
+[21:53:03.083] MEMORY: 1 records (1 facts, 0 sessions)
+[21:53:03.086] LLM: start: backend=bonsai model=bonsai
+[21:53:03.654] LLM: first token at 567ms
+[21:53:07.552] LLM: 161 tokens in 4466ms (36.05 tok/s)
+[21:53:07.552] TTS: start
+[21:53:07.794] GPU: vram=7932/8192MB util=97%
+[21:53:12.800] GPU: vram=7932/8192MB util=0%
+[21:53:17.807] GPU: vram=7990/8192MB util=0%
+[21:53:22.813] GPU: vram=8006/8192MB util=2%
+[21:53:27.819] GPU: vram=7995/8192MB util=1%
+[21:53:32.830] GPU: vram=7986/8192MB util=1%
+[21:53:37.843] GPU: vram=7986/8192MB util=0%
+[21:53:42.859] GPU: vram=7985/8192MB util=0%
+[21:53:47.861] GPU: vram=7991/8192MB util=2%
+[21:53:52.873] GPU: vram=7990/8192MB util=0%
+[21:53:56.215] TTS: 48662ms
+[21:53:56.215] ASSISTANT: Could you clarify what you mean by "Moist Critical"?
+
+This could refer to:
+1.  **A specific term or concept**: In some contexts, "moist" is used as slang (often derogatorily) to describe something bor...
+[21:53:56.215] TURN TOTAL: 53175ms
+[21:53:57.880] GPU: vram=7985/8192MB util=2%
+[21:54:02.886] GPU: vram=7982/8192MB util=2%
+[21:54:04.951] ────: ────────────────────────────────────────────────────────────
+[21:54:04.951] USER: I am talking about a Twitch streamer named Moist Critical also known as PenguinZZero
+[21:54:05.447] ROUTE: → chat (495ms, conf=1.00)
+[21:54:05.474] MEMORY: 0 records
+[21:54:05.504] LLM: start: backend=bonsai model=bonsai
+[21:54:05.853] LLM: first token at 340ms
+[21:54:07.893] GPU: vram=7983/8192MB util=96%
+[21:54:09.507] LLM: 149 tokens in 3993ms (37.32 tok/s)
+[21:54:09.507] TTS: start
+[21:54:11.833] TTS: 2326ms
+[21:54:11.833] ASSISTANT: I am not familiar with a Twitch streamer specifically named **"Moist Critical"** who goes by the alias **"PenguinZZero"**.
+
+It is possible that:
+1.  The streamer uses these names in different contexts...
+[21:54:11.833] TURN TOTAL: 6387ms
+[21:54:12.899] GPU: vram=7971/8192MB util=1%
+[21:54:17.915] GPU: vram=1184/8192MB util=0%
+[21:54:18.868] SESSION ended

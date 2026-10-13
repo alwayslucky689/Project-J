@@ -255,9 +255,56 @@ def _post_chat(payload: dict, timeout, stream: bool = False) -> requests.Respons
     return r
 
 
-def chat_stream_tokens(messages: list[dict],
-                       model: Optional[str] = None) -> Generator[str, None, None]:
-    """Stream tokens from /api/chat. messages is a list of {role, content}."""
+def chat_stream_tokens_openai(messages, model=None):
+    from core.cancel import get_current
+    model = model or settings.BONSAI_MODEL
+    payload = {"model": model, "messages": messages, "stream": True}
+
+    try:
+        response = _post_openai_chat(payload, timeout=(10, 600), stream=True)
+    except OllamaError as e:
+        print(f"\n❌ {e}")
+        return
+
+    token = get_current()
+    if token is not None:
+        token.register_response(response)
+
+    try:
+        for raw in response.iter_lines(decode_unicode=False):
+            if token is not None and token.is_cancelled():
+                return
+            if not raw:
+                continue
+            line = raw.decode("utf-8", errors="ignore").strip()
+            if not line.startswith("data: "):
+                continue
+            data = line[6:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            choices = chunk.get("choices") or []
+            if not choices:
+                continue
+            delta = choices[0].get("delta") or {}
+            tok = delta.get("content", "")
+            if tok:
+                yield tok
+    except Exception as e:
+        # Response closed mid-iteration by cancel() — treat as normal end
+        if token is not None and token.is_cancelled():
+            return
+        raise
+    finally:
+        try: response.close()
+        except Exception: pass
+
+
+def chat_stream_tokens(messages, model=None):
+    from core.cancel import get_current
     model = model or settings.REASONING_MODEL
     payload = {"model": model, "messages": messages, "stream": True}
 
@@ -267,8 +314,14 @@ def chat_stream_tokens(messages: list[dict],
         print(f"\n❌ {e}")
         return
 
+    token = get_current()
+    if token is not None:
+        token.register_response(response)
+
     try:
         for raw in response.iter_lines(decode_unicode=False):
+            if token is not None and token.is_cancelled():
+                return
             if not raw:
                 continue
             try:
@@ -277,20 +330,93 @@ def chat_stream_tokens(messages: list[dict],
                 continue
             if chunk.get("done"):
                 break
-            token = (chunk.get("message") or {}).get("content", "")
-            if token:
-                yield token
+            tok = chunk.get("response", "")
+            if tok:
+                yield tok
+    except Exception:
+        if token is not None and token.is_cancelled():
+            return
+        raise
     finally:
-        response.close()
+        try: response.close()
+        except Exception: pass
+
+# ===== Native tool calling (Phase 7a) =====
+
+def chat_with_tools(messages: list[dict],
+                    tools: list[dict],
+                    model: Optional[str] = None,
+                    timeout=(10, 120)) -> dict:
+    """
+    Non-streaming chat with native tool support.
+
+    Returns:
+        {"content": str, "tool_calls": list, "raw": dict}
+
+    tool_calls is [] if the model chose not to call anything.
+    content is "" if the model chose to call a tool (Ollama clears content
+    when tool_calls are present — see ollama/ollama#8337).
+    """
+    model = model or settings.REASONING_MODEL
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+        "tools": tools,
+    }
+
+    try:
+        response = _post_chat(payload, timeout=timeout)
+    except OllamaError as e:
+        return {"content": "", "tool_calls": [], "raw": {"error": str(e)}}
+
+    try:
+        data = response.json()
+    except Exception as e:
+        return {"content": "", "tool_calls": [],
+                "raw": {"error": f"invalid json: {e}"}}
+
+    msg = data.get("message") or {}
+    return {
+        "content": (msg.get("content") or "").strip(),
+        "tool_calls": msg.get("tool_calls") or [],
+        "raw": data,
+    }
 
 
+def append_tool_exchange(messages: list[dict],
+                         tool_call: dict,
+                         result_text: str) -> list[dict]:
+    """
+    Return a new message list with the assistant's tool_call and the tool
+    result appended, in the shape Ollama expects for the follow-up call.
+
+    Ollama requires the assistant message to echo the tool_call, followed
+    by a role:"tool" message carrying the result under the matching
+    tool_name.
+    """
+    fn = tool_call.get("function") or {}
+    name = fn.get("name", "")
+    return [
+        *messages,
+        {"role": "assistant", "content": "", "tool_calls": [tool_call]},
+        {"role": "tool", "tool_name": name, "content": result_text},
+    ]
 def chat_streaming(messages: list[dict],
                    model: Optional[str] = None,
                    on_token=None) -> str:
-    """Stream a chat completion, printing tokens and returning the full text."""
+    """Stream a chat completion, printing tokens and returning the full text.
+    Dispatches to Ollama or Bonsai based on settings.CHAT_BACKEND."""
     print("🤖 ", end="", flush=True)
     full = ""
-    for token in chat_stream_tokens(messages, model=model):
+
+    backend = getattr(settings, "CHAT_BACKEND", "ollama")
+    if backend == "bonsai":
+        gen = chat_stream_tokens_openai(messages, model=model)
+    else:
+        gen = chat_stream_tokens(messages, model=model)
+
+    for token in gen:
         print(token, end="", flush=True)
         if on_token is not None:
             try:
@@ -301,3 +427,58 @@ def chat_streaming(messages: list[dict],
     if full:
         print()
     return full.strip()
+# ===== OpenAI-compatible chat client (for Bonsai via llama-server) =====
+
+def _post_openai_chat(payload: dict, timeout, stream: bool = False) -> requests.Response:
+    url = settings.BONSAI_URL
+    try:
+        r = requests.post(url, json=payload, timeout=timeout, stream=stream)
+    except requests.exceptions.ConnectionError as e:
+        raise OllamaError(f"Cannot connect to Bonsai server: {e}") from e
+    except requests.exceptions.Timeout as e:
+        raise OllamaError(f"Bonsai timed out: {e}") from e
+    except requests.exceptions.RequestException as e:
+        raise OllamaError(f"Bonsai request failed: {e}") from e
+    if r.status_code != 200:
+        raise OllamaError(f"Bonsai returned HTTP {r.status_code}")
+    return r
+
+
+def chat_stream_tokens_openai(messages: list[dict],
+                              model: Optional[str] = None
+                              ) -> Generator[str, None, None]:
+    """Stream tokens from an OpenAI-compatible /v1/chat/completions endpoint.
+    Parses SSE format: 'data: {json}' lines terminated by 'data: [DONE]'.
+    Only yields delta.content — reasoning deltas are skipped."""
+    model = model or settings.BONSAI_MODEL
+    payload = {"model": model, "messages": messages, "stream": True}
+
+    try:
+        response = _post_openai_chat(payload, timeout=(10, 600), stream=True)
+    except OllamaError as e:
+        print(f"\n❌ {e}")
+        return
+
+    try:
+        for raw in response.iter_lines(decode_unicode=False):
+            if not raw:
+                continue
+            line = raw.decode("utf-8", errors="ignore").strip()
+            if not line.startswith("data: "):
+                continue
+            data = line[6:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            choices = chunk.get("choices") or []
+            if not choices:
+                continue
+            delta = choices[0].get("delta") or {}
+            token = delta.get("content", "")
+            if token:
+                yield token
+    finally:
+        response.close()

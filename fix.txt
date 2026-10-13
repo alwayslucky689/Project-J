@@ -1,2 +1,8 @@
 fix parakeet loading time
 add logging for sessions for debugging
+make chrome auto change volume on yt embeds
+cancel elevenlabs automatically before 3 months passes
+make ai textbook problem scrape
+add hardstop with text
+add 1 fake prompt that doesnt get saved to warm up llm each run
+bonsai in chat mode talks too much with points etc make it more natural

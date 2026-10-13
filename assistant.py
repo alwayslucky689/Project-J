@@ -1,4 +1,7 @@
 import threading
+from debug import debug_log as dbg
+from memory.classifier import needs_memory_lookup
+from tools.memory_tools import SEARCH_MEMORY_SCHEMA, search_memory
 from dataclasses import dataclass
 from memory import topics as topics_mod
 from tts.tts_manager import speak_async
@@ -7,7 +10,7 @@ from core.personality import PersonalityManager
 from core.prompts import build_tool_schema, COMMAND_JSON_RULES
 from core.llm import ask_ollama, ask_ollama_streaming, route_to_tool
 from core.registry import get_tool
-from tools import youtube, spotify, discord, ollama, ookla, personality_tools, tts_tools
+from tools import personality_tools
 from memory.fact_memory import get_facts_context, save_fact
 from audio_pipeline import AudioPipeline
 from config.paths import STT_VENV_PYTHON, STT_SERVICE_SCRIPT
@@ -23,6 +26,11 @@ from memory.sessions import (
     start_session, close_session, append_user_turn, append_assistant_turn,
 )
 from memory.worker import start_worker, stop_worker, notify_activity
+from tools import (youtube, spotify, discord, ollama, ookla,
+                   personality_tools, tts_tools, memory_tools)
+from core.cancel import CancelToken, set_current, get_current
+import msvcrt
+
 
 def _build_chat_system_prompt(query: str) -> str:
     """
@@ -35,12 +43,13 @@ def _build_chat_system_prompt(query: str) -> str:
     """
     return personality_mgr.get_persona_prompt()
 
+
 conversation = get_manager(
     system_prompt_fn=_build_chat_system_prompt,
     max_turns=10,
 )
 
-#flags to run
+
 def parse_args():
     p = argparse.ArgumentParser(
         description="Project-J voice assistant",
@@ -51,6 +60,7 @@ def parse_args():
             "  python assistant.py --no-stt            # text input only, skip Parakeet\n"
             "  python assistant.py --no-tts            # voice input, silent responses\n"
             "  python assistant.py --no-stt --no-tts   # pure text REPL\n"
+            "  python assistant.py --backend bonsai    # force Bonsai backend for this run\n"
         ),
     )
     p.add_argument(
@@ -65,12 +75,24 @@ def parse_args():
         action="store_true",
         help="Start with TTS disabled (silent responses)",
     )
+    p.add_argument(
+        "--backend",
+        choices=["ollama", "bonsai"],
+        help="Override CHAT_BACKEND for this run",
+    )
+    p.add_argument(
+        "--debug",
+        action="store_true",
+        help="Echo debug log lines to console as they're written",
+    )
     return p.parse_args()
+
 
 def _ts(label: str, t0: float):
     """Print a labeled timestamp delta if TIMING is enabled."""
     if getattr(_settings, "TIMING", False):
         print(f"⏱️  [{label}] {(time.perf_counter() - t0) * 1000:.0f}ms")
+
 
 _YOUTUBE_SEARCH = re.compile(
     r"\bsearch\s+(?:for\s+)?(.+?)"
@@ -88,6 +110,7 @@ _WORD_NUM = {
     "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5,
 }
 
+
 def _try_youtube_ref(query: str):
     """
     Short-circuit YouTube search + play commands.
@@ -104,19 +127,16 @@ def _try_youtube_ref(query: str):
     ref_m = _YOUTUBE_REF.search(query)
     search_m = _YOUTUBE_SEARCH.search(query)
 
-    # Only fire the search branch for bare "search X" queries (no play word)
     if search_m and not ref_m:
         term = search_m.group(1).strip()
         if term:
             return {"tool": "search_youtube", "query": term}
 
-    # Compound: search + play in the same input
     if search_m and ref_m:
         term = search_m.group(1).strip()
         if term:
             actions.append({"tool": "search_youtube", "query": term})
 
-    # Play branch (single or as second step of compound)
     if ref_m:
         tok = ref_m.group(1).lower()
         if tok.isdigit():
@@ -132,24 +152,22 @@ def _try_youtube_ref(query: str):
         return None
     return actions[0] if len(actions) == 1 else actions
 
+
 # ===== Response contract =====
 @dataclass
 class AssistantResponse:
     text: str = ""
-    was_streamed: bool = False   # True if already printed during streaming
-    speak: bool = True           # Whether the caller should TTS this
+    was_streamed: bool = False
+    speak: bool = True
     was_spoken: bool = False
+
 
 import re as _re
 
 _TOPIC_CMD = _re.compile(r"^\s*topic\b\s*(.*)$", _re.IGNORECASE)
 
+
 def _try_topic_command(user_input: str):
-    """
-    Outer wrapper. Matches the 'topic' prefix, passes the rest to the
-    dispatcher, and handles persistence + buffer reload after a switch.
-    Returns an AssistantResponse if handled, else None.
-    """
     m = _TOPIC_CMD.match(user_input)
     if not m:
         return None
@@ -170,13 +188,8 @@ def _try_topic_command(user_input: str):
 
 
 def _dispatch_topic_command(arg: str):
-    """
-    arg is everything after 'topic', already stripped.
-    Examples: '', 'list', 'off', 'new spanish', 'delete project-j', 'spanish'
-    """
     arg_lower = arg.lower()
 
-    # Bare "topic" or "topic list"
     if not arg or arg_lower == "list":
         return _render_topic_list()
 
@@ -198,6 +211,12 @@ def _dispatch_topic_command(arg: str):
             return AssistantResponse(text="Usage: topic delete <name>")
         return AssistantResponse(text=topics_mod.delete_topic(name))
 
+    if arg_lower.startswith("suggest "):
+        name = arg[8:].strip()
+        if not name:
+            return AssistantResponse(text="Usage: topic suggest <string>")
+        return _render_suggestions(name)
+
     return _switch_to_topic(arg)
 
 
@@ -217,7 +236,6 @@ def _create_and_switch(name: str) -> AssistantResponse:
 def _switch_to_topic(name: str) -> AssistantResponse:
     topic, sid, is_new = topics_mod.activate_topic(name)
     if topic is None:
-        # Offer to create it
         return AssistantResponse(
             text=(f"No topic named '{name}'. "
                   f"Create it with: topic new {name}")
@@ -226,6 +244,20 @@ def _switch_to_topic(name: str) -> AssistantResponse:
     return AssistantResponse(
         text=f"📂 {verb} topic '{topic['name']}' (session {sid})."
     )
+
+
+def _render_suggestions(query: str) -> AssistantResponse:
+    from memory.activation import suggest, FUZZY_THRESHOLD
+    scored = suggest(query)
+    if not scored:
+        return AssistantResponse(text="No topics exist yet.")
+    lines = [f"Suggestions for {query!r}:"]
+    for topic, score in scored[:5]:
+        marker = "▶" if score >= FUZZY_THRESHOLD else " "
+        aliases = topic.get("aliases") or []
+        alias_str = f"  (aliases: {', '.join(aliases)})" if aliases else ""
+        lines.append(f"  {marker} {score:.2f}  {topic['name']}{alias_str}")
+    return AssistantResponse(text="\n".join(lines))
 
 
 def _render_topic_list() -> AssistantResponse:
@@ -253,12 +285,11 @@ def _render_topic_list() -> AssistantResponse:
 
     return AssistantResponse(text="\n".join(lines))
 
+
 # ===== Initialization =====
 personality_mgr = PersonalityManager()
 
 
-# system_prompt_fn is called fresh on every turn so personality switches
-# and (future) memory injections take effect immediately.
 conversation = get_manager(
     system_prompt_fn=lambda q: personality_mgr.get_persona_prompt(),
     max_turns=10,
@@ -267,22 +298,23 @@ personality_tools.init_personality_tools(personality_mgr)
 
 audio_pipeline = None  # type: AudioPipeline | None
 
+
 def _reload_buffer_for_session(sid: int):
-    """Ensure the in-memory buffer for `sid` matches the DB.
-    Called after any context switch so the assistant has the session's
-    recent turns available."""
     loaded = conversation.load_from_db(sid, limit=20)
     if loaded:
         print(f"   ↻ Loaded {loaded} turns from DB for session {sid}")
+
+
 # ===== System Prompt Builder =====
 def build_system_prompt(user_input: str) -> str:
     """Full prompt for the fast model on the tool/command path."""
     persona = personality_mgr.get_persona_prompt()
-    facts = get_facts_context(user_input)   # ← now takes the query
+    facts = get_facts_context(user_input)
     tool_schema = build_tool_schema()
     rules = COMMAND_JSON_RULES.replace("{user_input}", user_input)
     parts = [persona, facts, tool_schema, rules]
     return "\n\n".join(p for p in parts if p)
+
 
 # ===== TTS (blocking) =====
 def _speak_safe(text):
@@ -302,40 +334,127 @@ def _speak_safe(text):
     except Exception as e:
         print(f"⚠️ TTS error: {e}")
 
+
+def _try_nl_topic_activation(user_input: str):
+    from memory import activation as act_mod
+
+    outcome = act_mod.try_activate(user_input)
+    if outcome is None:
+        return None
+
+    if outcome["action"] == "activated":
+        topic = outcome["topic"]
+        verb = "Started" if outcome["is_new"] else "Switched to"
+        response = AssistantResponse(
+            text=f"📂 {verb} topic '{topic['name']}' "
+                 f"(session {outcome['session_id']})."
+        )
+        _persist_turn("user", user_input)
+        _persist_turn("assistant", response.text)
+
+        from memory.sessions import get_current_session_id
+        sid = get_current_session_id()
+        if sid is not None:
+            _reload_buffer_for_session(sid)
+        return response
+
+    names = [t["name"] for t in outcome["options"]]
+    if len(names) == 2:
+        options_str = f"{names[0]} or {names[1]}"
+    else:
+        options_str = ", ".join(names[:-1]) + f", or {names[-1]}"
+    response = AssistantResponse(
+        text=f"Which did you mean: {options_str}?"
+    )
+    _persist_turn("user", user_input)
+    _persist_turn("assistant", response.text)
+    return response
+
+
+def _poll_for_cancel() -> bool:
+    """
+    Non-blocking check for Esc. Drains any pending keys so they don't
+    leak into the next input() call. Returns True if Esc was pressed.
+    """
+    found = False
+    try:
+        while msvcrt.kbhit():
+            ch = msvcrt.getwch()
+            if ch == "\x1b":   # Esc — VS Code doesn't steal this the way it
+                               # steals Ctrl+F (which opens its search box)
+                found = True
+    except Exception:
+        pass
+    return found
+
+
 from memory.sessions import get_or_create_session
+
+
 # ===== Command Router =====
 def route_request(user_input: str) -> AssistantResponse:
+    stripped = user_input.strip().lower()
+    if stripped in ("stop", "cancel", "shut up"):
+        tok = get_current()
+        if tok is not None and not tok.is_cancelled():
+            tok.cancel()
+            return AssistantResponse(text="Cancelled.", speak=False)
+        return AssistantResponse(text="Nothing to cancel.", speak=False)
+
+    set_current(None)
+
     t0 = time.perf_counter()
+    sid = get_or_create_session()
+    dbg.turn_start(user_input)
+
     topic_response = _try_topic_command(user_input)
     if topic_response is not None:
+        dbg.route("topic_command", (time.perf_counter() - t0) * 1000)
         return topic_response
-    # --- Personality wake-word check ---
+
+    nl_topic = _try_nl_topic_activation(user_input)
+    if nl_topic is not None:
+        dbg.route("nl_topic", (time.perf_counter() - t0) * 1000)
+        return nl_topic
+
     detected = personality_mgr.detect_personality(user_input)
     if detected and personality_mgr.switch_to(detected):
         for word in personality_mgr.get_wake_words(detected):
             user_input = user_input.lower().replace(word.lower(), "").strip()
     if detected != "None" and detected != None:
         print(f" Switched personality to: {detected}")
+
     if not user_input:
         resp = f"{personality_mgr.get_display_name()} active. How can I help?"
-        _persist_turn("assistant", resp,sid)
+        _persist_turn("assistant", resp, sid)
         return AssistantResponse(text=resp)
-    sid = get_or_create_session()
+
     ref = _try_youtube_ref(user_input)
     if ref is not None:
         result = execute_tool(ref)
-        _persist_turn("user", user_input,sid)
-        _persist_turn("assistant", result,sid)
+        dbg.route("youtube_short_circuit", (time.perf_counter() - t0) * 1000)
+        _persist_turn("user", user_input, sid)
+        _persist_turn("assistant", result, sid)
+        dbg.assistant(result)
+        dbg.turn_end((time.perf_counter() - t0) * 1000)
         return AssistantResponse(text=result, was_streamed=False)
-    elif settings.USE_NEEDLE_ROUTER:
+
+    if settings.USE_NEEDLE_ROUTER:
         t_route = time.perf_counter()
         decision = route_to_tool(user_input)
+        route_ms = (time.perf_counter() - t_route) * 1000
         _ts("needle", t_route)
     else:
         t_route = time.perf_counter()
         router_prompt = build_system_prompt(user_input)
         decision = ask_ollama(router_prompt, is_json=True, model=settings.FAST_MODEL)
+        route_ms = (time.perf_counter() - t_route) * 1000
         _ts("llama router", t_route)
+
+    tool_name = decision.get("tool") if isinstance(decision, dict) else None
+    conf = decision.get("_confidence") if isinstance(decision, dict) else None
+    candidates = decision.get("_candidates") if isinstance(decision, dict) else None
+    dbg.route(tool_name or "?", route_ms, conf, candidates)
 
     if not isinstance(decision, dict) or decision.get("tool") == "chat":
         question = user_input
@@ -343,21 +462,24 @@ def route_request(user_input: str) -> AssistantResponse:
             question = decision.get("message") or user_input
         response, spoken = _handle_chat_streaming(question)
         return AssistantResponse(
-            text=response,
-            was_streamed=True,
-            was_spoken=spoken,
+            text=response, was_streamed=True, was_spoken=spoken,
         )
 
     t_tool = time.perf_counter()
     result = execute_tool(decision)
-    _persist_turn("user", user_input,sid)
-    _persist_turn("assistant", result,sid)
+    _persist_turn("user", user_input, sid)
+    _persist_turn("assistant", result, sid)
+    dbg.assistant(result)
+    dbg.turn_end((time.perf_counter() - t0) * 1000)
     return AssistantResponse(text=result, was_streamed=False)
+
+
 def _build_chat_prompt(user_input: str) -> str:
-    """Persona + per-personality chat template, with user input filled in."""
     persona = personality_mgr.get_persona_prompt()
     chat = personality_mgr.get_chat_prompt().replace("{user_input}", user_input)
     return f"{persona}\n\n{chat}"
+
+
 # ===== Tool Executor =====
 def execute_tool(decision):
     if isinstance(decision, list):
@@ -394,9 +516,6 @@ def execute_single_action(action):
     except Exception as e:
         return f"❌ Error executing {tool_name}: {e}"
 
-    # Failure check: if the handler returned False or None, use the failure
-    # template instead of the success template. This is why "Now playing"
-    # appeared after a Spotify connection error.
     if result is False or result is None:
         fail = personality_mgr.render("tool_failure")
         if fail:
@@ -408,6 +527,7 @@ def execute_single_action(action):
         return rendered
 
     return tool.format(result)
+
 
 # ===== Response handler (shared by voice + text) =====
 def handle_response(response: AssistantResponse):
@@ -422,13 +542,15 @@ def handle_response(response: AssistantResponse):
     ):
         _speak_safe(response.text)
 
+
 _EXIT_PHRASES = {
     "quit", "exit", "shut down", "shutdown",
     "goodbye", "good bye", "bye", "shut up"
 }
+
+
 # ===== Voice Callback =====
 def on_transcription(text):
-    """Called by audio_pipeline with recognized speech."""
     print(f"\n  Processing: {text}")
 
     if text.strip().lower().rstrip(".!?") in _EXIT_PHRASES:
@@ -447,70 +569,233 @@ def on_transcription(text):
         if audio_pipeline:
             audio_pipeline.set_speaking(False)
 
+
 def _handle_chat_streaming(question: str) -> tuple[str, bool]:
     from memory.sessions import get_or_create_session
     from tts.tts_manager import is_muted
+    from core.llm import chat_stream_tokens, chat_stream_tokens_openai
+    from memory.retrieval import assemble_memory
 
     sid = get_or_create_session()
     tts_active = settings.ENABLE_TTS and not is_muted()
 
+    t_turn = time.perf_counter()
+
+    # Time retrieval, then log it
+    t_mem = time.perf_counter()
     messages = conversation.get_messages(sid, current_user_input=question)
+    try:
+        records = assemble_memory(question, sid)
+        dbg.memory(records)
+    except Exception as e:
+        dbg.error(f"memory retrieval failed: {e}")
+        dbg.memory([])
 
-    if not tts_active:
-        full = chat_streaming(messages, model=settings.REASONING_MODEL)
-        conversation.add_user(sid, question)
-        conversation.add_assistant(sid, full)
-        _persist_turn("user", question,sid)
-        _persist_turn("assistant", full,sid)
-        return full, False
+    # Memory tool path
+    if needs_memory_lookup(question):
+        memory_answer = _try_memory_tool_path(messages, sid)
+        if memory_answer is not None:
+            conversation.add_user(sid, question)
+            conversation.add_assistant(sid, memory_answer)
+            _persist_turn("user", question, sid)
+            _persist_turn("assistant", memory_answer, sid)
+            dbg.assistant(memory_answer)
+            dbg.turn_end((time.perf_counter() - t_turn) * 1000)
+            return memory_answer, False
 
-    from tts.streaming_tts import StreamingTTS
-    streamer = StreamingTTS()
-    streamer.start()
+    # Streaming path
+    token = CancelToken()
+    set_current(token)
+
+    streamer = None
+    if tts_active:
+        from tts.streaming_tts import StreamingTTS
+        streamer = StreamingTTS()
+        streamer.start()
+        token.register_streamer(streamer)
+
+    backend = getattr(settings, "CHAT_BACKEND", "ollama")
+    model_name = (getattr(settings, "BONSAI_MODEL", "?")
+                  if backend == "bonsai"
+                  else getattr(settings, "REASONING_MODEL", "?"))
+    dbg.llm_start(backend, model_name)
+
+    if backend == "bonsai":
+        gen = chat_stream_tokens_openai(messages, model=settings.REASONING_MODEL)
+    else:
+        gen = chat_stream_tokens(messages, model=settings.REASONING_MODEL)
+
+    print("🤖 ", end="", flush=True)
+    full = ""
+    token_count = 0
+    cancelled = False
+    t_llm = time.perf_counter()
+    t_first = None
 
     try:
-        full = chat_streaming(
-            messages,
-            model=settings.REASONING_MODEL,
-            on_token=streamer.push_token,
-        )
+        for tok in gen:
+            if _poll_for_cancel() and not token.is_cancelled():
+                print("\n⏹️  Cancelled (Esc).")
+                token.cancel()
+
+            if token.is_cancelled():
+                cancelled = True
+                break
+
+            if t_first is None:
+                t_first = time.perf_counter()
+                dbg.llm_first_token((t_first - t_llm) * 1000)
+
+            print(tok, end="", flush=True)
+            if streamer is not None:
+                streamer.push_token(tok)
+            full += tok
+            token_count += 1
     finally:
-        streamer.finish()
+        if full:
+            print()
+        t_llm_done = time.perf_counter()
+        dbg.llm_done(token_count, (t_llm_done - t_llm) * 1000)
+
+        if streamer is not None:
+            t_tts = time.perf_counter()
+            dbg.tts_start()
+            try:
+                streamer.finish()
+            except Exception:
+                pass
+            dbg.tts_done((time.perf_counter() - t_tts) * 1000)
+        set_current(None)
 
     conversation.add_user(sid, question)
-    conversation.add_assistant(sid, full)
-    _persist_turn("user", question,sid)
-    _persist_turn("assistant", full,sid)
+    if full:
+        conversation.add_assistant(sid, full)
+    _persist_turn("user", question, sid)
+    if full:
+        _persist_turn("assistant", full, sid, excluded=cancelled)
+
+    dbg.assistant(full)
+    dbg.turn_end((time.perf_counter() - t_turn) * 1000)
     return full, True
 
-def _persist_turn(role: str, text: str, session_id = None):
+
+def _try_memory_tool_path(messages: list, sid: int) -> str | None:
+    from core.llm import chat_with_tools, append_tool_exchange
+
+    debug = getattr(settings, "TIMING", False)
+
+    result = chat_with_tools(
+        messages,
+        tools=[SEARCH_MEMORY_SCHEMA],
+        model=settings.REASONING_MODEL,
+    )
+
+    if result.get("raw", {}).get("error"):
+        print(f"⚠️ Tool-enabled chat failed: {result['raw']['error']}")
+        return None
+
+    tool_calls = result.get("tool_calls") or []
+    if debug:
+        print(f"   [7a] first call: {len(tool_calls)} tool_call(s), "
+              f"content={result.get('content','')[:60]!r}")
+
+    if not tool_calls:
+        content = result.get("content", "").strip()
+        if debug and not content:
+            print("   [7a] model produced no tool call and no content")
+        return content or None
+
+    messages_with_tool = messages
+    for tc in tool_calls:
+        fn = tc.get("function") or {}
+        name = fn.get("name")
+        args = fn.get("arguments") or {}
+
+        if debug:
+            print(f"   [7a] tool call: {name}({args})")
+
+        if name != "search_memory":
+            tool_result = f"(unknown tool: {name})"
+        else:
+            query = args.get("query") or ""
+            try:
+                tool_result = search_memory(query)
+            except Exception as e:
+                tool_result = f"(tool error: {e})"
+
+        if debug:
+            preview = tool_result[:80].replace("\n", " ")
+            print(f"   [7a] tool result: {preview}...")
+
+        messages_with_tool = append_tool_exchange(
+            messages_with_tool, tc, tool_result
+        )
+
+    follow_up = chat_with_tools(
+        messages_with_tool,
+        tools=[SEARCH_MEMORY_SCHEMA],
+        model=settings.REASONING_MODEL,
+    )
+
+    if follow_up.get("raw", {}).get("error"):
+        print(f"⚠️ Tool follow-up failed: {follow_up['raw']['error']}")
+        return None
+
+    content = (follow_up.get("content") or "").strip()
+    if debug:
+        print(f"   [7a] second call: content={content[:80]!r}")
+
+    if not content:
+        return None
+
+    messages[:] = messages_with_tool
+    return content
+
+
+def _persist_turn(role: str, text: str, session_id=None, excluded: bool = False):
+    """Write a turn. If excluded=True, mark it to skip future extraction."""
     if not text:
-        return
+        return None
     try:
         from memory.sessions import append_user_turn, append_assistant_turn
+        from memory.store import write_transaction
         from memory.worker import notify_activity
         if role == "user":
-            append_user_turn(text, session_id=session_id)
+            turn_id = append_user_turn(text, session_id=session_id)
         else:
-            append_assistant_turn(text, session_id=session_id)
+            turn_id = append_assistant_turn(text, session_id=session_id)
+        if excluded and turn_id is not None:
+            with write_transaction() as conn:
+                conn.execute(
+                    "UPDATE turns SET excluded_from_extraction = 1 WHERE id = ?",
+                    (turn_id,),
+                )
         notify_activity()
+        return turn_id
     except Exception as e:
         print(f"⚠️ Could not persist turn: {e}")
+        return None
+
+
 # ===== Main =====
 def main():
     global audio_pipeline
     args = parse_args()
 
-    # Apply TTS override before anything reads settings.ENABLE_TTS
     if args.tts_off:
         settings.ENABLE_TTS = False
-        # Start a memory session and the background extraction worker
+
     from memory.sessions import get_or_create_session, close_session
     sid = get_or_create_session()
     loaded = conversation.load_from_db(sid, limit=20)
     if loaded:
         print(f"📖 Resumed session {sid} with {loaded} recent turns.")
     start_worker()
+    dbg.init(session_id=sid, debug=getattr(args, "debug", False))
+    if (getattr(settings, "CHAT_BACKEND", "ollama") == "bonsai"
+            and getattr(settings, "BONSAI_AUTOSTART", True)):
+        from bonsai.bonsai_server import start as _start_bonsai
+        _start_bonsai()
     print("=" * 60)
     print("🤖 Project-J AI Assistant")
     print("=" * 60)
@@ -548,10 +833,12 @@ def main():
     if not args.stt_off:
         print("🎤 Voice mode — say 'Jarvis' to wake.")
     print("Type 'topic' for topics, 'topic new <name>' to create.")
+    print("Press Esc during a response to cancel it.")
     print("Type 'quit' to exit.")
     print("-" * 60 + "\n")
     from memory.store import backfill_fact_embeddings
     backfill_fact_embeddings()
+
     while True:
         try:
             user_input = input("⌨️  You: ").strip()
@@ -567,19 +854,33 @@ def main():
             conversation.clear()
             print(" Conversation cleared.")
             continue
+        if user_input.lower() in ("stop", "cancel", "shut up"):
+            # Between turns, no streaming is active, so this is basically
+            # a no-op acknowledgement. Still useful as a reset point.
+            tok = get_current()
+            if tok is not None and not tok.is_cancelled():
+                tok.cancel()
+                print("⏹️  Cancelled.")
+            else:
+                print("Nothing to cancel.")
+            continue
         try:
             response = route_request(user_input)
             handle_response(response)
         except Exception as e:
             print(f"❌ Error: {e}")
+
     stop_worker()
     from memory.sessions import close_session as _close, get_current_session_id
     sid = get_current_session_id()
     _close(sid)
     if sid is not None:
         conversation.discard(sid)
+    from bonsai.bonsai_server import stop as _stop_bonsai
+    _stop_bonsai()
     if audio_pipeline:
         audio_pipeline.stop()
+    dbg.shutdown()
     print(" Goodbye!")
 
 

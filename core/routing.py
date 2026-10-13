@@ -26,7 +26,15 @@ from __future__ import annotations
 CATEGORIES = {
 
     # ===== YouTube =====
-
+    "memory_save": {
+        "signals": [
+            "remember that", "remember to", "remember i ", "remember my ",
+            "note that", "keep in mind",
+            "don't forget", "dont forget",
+            "save this", "save that",
+        ],
+        "tools": {"remember_fact"},
+    },
     "youtube_open": {
         "signals": ["open youtube", "go to youtube", "launch youtube"],
         "tools": {"open_youtube"},
@@ -164,12 +172,6 @@ CATEGORIES = {
     },
 
     # ===== Memory =====
-
-    "memory_save": {
-        "signals": ["remember", "note that", "keep in mind",
-                    "don't forget", "dont forget", "save this"],
-        "tools": {"remember_fact"},
-    },
 
     # ===== Personality =====
 

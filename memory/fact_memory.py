@@ -95,7 +95,8 @@ def _embed_fact(fact_id: int, text: str):
 
 
 def forget_fact(fact_id: Optional[int] = None,
-                search: Optional[str] = None) -> str:
+                search: Optional[str] = None,
+                reason: str = "user requested forget") -> str:
     """
     Mark a fact as deleted and tombstone it so re-extraction can't recreate it.
     Provide either fact_id (precise) or search (case-insensitive substring).
@@ -144,7 +145,7 @@ def forget_fact(fact_id: Optional[int] = None,
             (
                 "default", row["subject"], row["property"],
                 row["scope_type"], row["scope_topic_id"],
-                now, "user requested forget",
+                now, reason,
             ),
         )
 
@@ -391,24 +392,24 @@ def _forget_fact(fact_id=None, search=None):
 def _list_facts():
     conn = get_conn()
     rows = conn.execute(
-            """
-            SELECT fe.fact_id, fe.distance, f.text
-            FROM fact_embeddings fe
-            JOIN facts f ON f.id = fe.fact_id
-            WHERE f.status='active'
-              AND fe.embedding MATCH ?
-            ORDER BY fe.distance
-            LIMIT ?
-            """,
-            (_vec_to_blob(qvec), max_facts * 2),
-        ).fetchall()
+        """
+        SELECT id, text, scope_type, scope_topic_id, pinned
+        FROM facts
+        WHERE user_id='default' AND status='active'
+        ORDER BY pinned DESC, created_at DESC
+        LIMIT 50
+        """
+    ).fetchall()
     if not rows:
         return "No facts stored yet."
     lines = [f"📋 {len(rows)} facts:"]
     for r in rows:
-        lines.append(f"  [{r['id']}] {r['text']}")
+        marker = "📌" if r["pinned"] else "  "
+        scope = r["scope_type"]
+        if r["scope_topic_id"]:
+            scope = f"{scope}:{r['scope_topic_id']}"
+        lines.append(f"  {marker} [{r['id']}] ({scope}) {r['text']}")
     return "\n".join(lines)
-
 
 register(Tool(
     name="remember_fact",

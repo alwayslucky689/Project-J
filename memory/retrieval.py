@@ -71,14 +71,55 @@ def _extract_topic_id(context: str) -> Optional[int]:
 
 
 # ===== Public API =====
+def diagnose_retrieval(query: str,
+                       session_id: Optional[int] = None) -> dict:
+    """
+    Run assemble_memory with a diagnostic sink and return both the kept
+    records and every rejected candidate with a reason. Used by
+    `python -m memory.inspect retrieve`.
+    """
+    rejected: list[dict] = []
+    kept = assemble_memory(query, session_id, _diag=rejected)
 
+    context = _get_session_context(session_id)
+    topic_id = _extract_topic_id(context)
+
+    # Corpus totals — context for the rejection counts.
+    conn = get_conn()
+    total_facts = conn.execute(
+        "SELECT COUNT(*) c FROM facts WHERE status='active' AND pinned=0"
+    ).fetchone()["c"]
+    total_sessions = conn.execute(
+        "SELECT COUNT(*) c FROM sessions WHERE summary IS NOT NULL"
+    ).fetchone()["c"]
+    pinned = conn.execute(
+        "SELECT COUNT(*) c FROM facts WHERE status='active' AND pinned=1"
+    ).fetchone()["c"]
+
+    return {
+        "query": query,
+        "session_id": session_id,
+        "context": context,
+        "topic_id": topic_id,
+        "corpus": {
+            "active_unpinned_facts": total_facts,
+            "sessions_with_summary": total_sessions,
+            "pinned_facts": pinned,
+        },
+        "kept": kept,
+        "rejected": rejected,
+    }
 def assemble_memory(query: str,
-                    session_id: Optional[int] = None) -> list[dict]:
+                    session_id: Optional[int] = None,
+                    _diag: Optional[list] = None) -> list[dict]:
     """
     Assemble memory records for the current query, scoped by the session's
     context. In a topic context, retrieves topic-scoped facts and topic
     session summaries as priority layers, plus global facts and sessions.
     In global context, only global and unscoped content is retrieved.
+
+    If _diag is a list, every candidate that gets rejected (plus the
+    layer + reason) is appended to it. Used by diagnose_retrieval().
     """
     context = _get_session_context(session_id)
     topic_id = _extract_topic_id(context)
@@ -91,10 +132,20 @@ def assemble_memory(query: str,
     except Exception as e:
         print(f"⚠️ Pinned load failed: {e}")
 
+    # Topic state: only when in a topic. Comes before the fact layers so
+    # the model sees the durable shape of the topic before its details.
+    if topic_id is not None:
+        try:
+            ts = _load_topic_state(topic_id)
+            if ts:
+                layers.append(("topic_state", ts))
+        except Exception as e:
+            print(f"⚠️ Topic state load failed: {e}")
+
     if query:
         try:
             topic_facts, global_facts = _retrieve_facts_split(
-                query, topic_id, limit_per_bucket=5,
+                query, topic_id, limit_per_bucket=5, _diag=_diag,
             )
         except Exception as e:
             print(f"⚠️ Fact retrieval failed: {e}")
@@ -108,16 +159,16 @@ def assemble_memory(query: str,
         try:
             if topic_id is not None:
                 topic_sessions = _retrieve_sessions(
-                    query, f"topic:{topic_id}", limit=2,
+                    query, f"topic:{topic_id}", limit=2, _diag=_diag,
                 )
                 if topic_sessions:
                     layers.append(("topic_sessions", topic_sessions))
                 global_sessions = _retrieve_sessions(
-                    query, "global", limit=1,
+                    query, "global", limit=1, _diag=_diag,
                 )
             else:
                 global_sessions = _retrieve_sessions(
-                    query, "global", limit=2,
+                    query, "global", limit=2, _diag=_diag,
                 )
             if global_sessions:
                 layers.append(("global_sessions", global_sessions))
@@ -134,13 +185,21 @@ def assemble_memory(query: str,
         layer_used = 0
         for r in records:
             key = (r.get("kind", "fact"), r.get("id", -1))
-            if key in seen_ids:
-                continue
             cost = _estimate_tokens(r.get("text", ""))
+
+            if key in seen_ids:
+                if _diag is not None:
+                    _diag.append(_reject(r, layer_name, "duplicate"))
+                continue
             if layer_used + cost > layer_cap:
-                break
+                if _diag is not None:
+                    _diag.append(_reject(r, layer_name, "over_layer_cap"))
+                continue
             if total_used + cost > MAX_MEMORY_TOKENS:
-                break
+                if _diag is not None:
+                    _diag.append(_reject(r, layer_name, "over_token_budget"))
+                continue
+
             r["layer"] = layer_name
             result.append(r)
             seen_ids.add(key)
@@ -149,7 +208,16 @@ def assemble_memory(query: str,
 
     return result
 
-
+def _reject(record: dict, layer: str, reason: str) -> dict:
+    """Build a diagnostic record for a rejected candidate."""
+    return {
+        "kind": record.get("kind", "fact"),
+        "id": record.get("id"),
+        "layer": layer,
+        "text": record.get("text", ""),
+        "distance": record.get("distance"),
+        "reason": reason,
+    }
 # ===== Layer loaders =====
 
 def _load_pinned() -> list[dict]:
@@ -177,8 +245,10 @@ def _load_pinned() -> list[dict]:
     } for r in rows]
 
 
+
 def _retrieve_facts_split(query: str, topic_id: Optional[int],
-                          limit_per_bucket: int = 5
+                          limit_per_bucket: int = 5,
+                          _diag: Optional[list] = None
                           ) -> tuple[list[dict], list[dict]]:
     """
     Return (topic_scoped, non_topic_scoped) records in one pass.
@@ -218,8 +288,6 @@ def _retrieve_facts_split(query: str, topic_id: Optional[int],
 
     for r in rows:
         d = id_to_dist[r["id"]]
-        if d > FACT_THRESHOLD:
-            continue
         rec = {
             "id": r["id"],
             "kind": "fact",
@@ -234,18 +302,46 @@ def _retrieve_facts_split(query: str, topic_id: Optional[int],
             "created_at": r["created_at"],
             "distance": d,
         }
+
+        # Which layer would this land in if kept?
         if topic_id is not None and r["scope_topic_id"] == topic_id:
-            topic_records.append(rec)
+            intended_layer = "topic_facts"
         elif r["scope_topic_id"] is None:
+            intended_layer = "global_facts"
+        else:
+            intended_layer = "other_topic"
+
+        if d > FACT_THRESHOLD:
+            if _diag is not None:
+                _diag.append(_reject(rec, intended_layer, "below_threshold"))
+            continue
+
+        if intended_layer == "topic_facts":
+            topic_records.append(rec)
+        elif intended_layer == "global_facts":
             global_records.append(rec)
+        else:
+            # Belongs to a different topic than the one we're in.
+            if _diag is not None:
+                _diag.append(_reject(rec, "other_topic", "other_topic_scope"))
+            continue
 
     topic_records.sort(key=lambda r: r["distance"])
     global_records.sort(key=lambda r: r["distance"])
+
+    # Bucket caps — record what got cut
+    if _diag is not None:
+        for r in topic_records[limit_per_bucket:]:
+            _diag.append(_reject(r, "topic_facts", "over_bucket_limit"))
+        for r in global_records[limit_per_bucket:]:
+            _diag.append(_reject(r, "global_facts", "over_bucket_limit"))
+
     return topic_records[:limit_per_bucket], global_records[:limit_per_bucket]
 
 
 def _retrieve_sessions(query: str, context_filter: str,
-                       limit: int = 2) -> list[dict]:
+                       limit: int = 2,
+                       _diag: Optional[list] = None) -> list[dict]:
     from memory.embed import embed, is_available
     if not is_available():
         return []
@@ -266,25 +362,46 @@ def _retrieve_sessions(query: str, context_filter: str,
     sid_to_dist = {r["session_id"]: r["distance"] for r in knn}
     placeholders = ",".join("?" * len(sid_to_dist))
     rows = conn.execute(
-        f"SELECT id, summary, started_at FROM sessions "
+        f"SELECT id, summary, started_at, context FROM sessions "
         f"WHERE id IN ({placeholders}) "
-        f"AND summary IS NOT NULL "
-        f"AND context = ?",
-        (*sid_to_dist.keys(), context_filter),
+        f"AND summary IS NOT NULL",
+        tuple(sid_to_dist.keys()),
     ).fetchall()
+
+    layer_name = ("topic_sessions" if context_filter.startswith("topic:")
+                  else "global_sessions")
 
     records = []
     for r in rows:
         d = sid_to_dist[r["id"]]
-        if d <= SESSION_THRESHOLD:
-            records.append({
-                "id": r["id"],
-                "kind": "session",
-                "text": r["summary"],
-                "created_at": r["started_at"],
-                "distance": d,
-            })
+        rec = {
+            "id": r["id"],
+            "kind": "session",
+            "text": r["summary"],
+            "created_at": r["started_at"],
+            "distance": d,
+        }
+
+        # Context filter — we pull all KNN matches and reject by context here
+        # so the diagnostic can see them.
+        if r["context"] != context_filter:
+            if _diag is not None:
+                _diag.append(_reject(rec, layer_name, "wrong_context"))
+            continue
+
+        if d > SESSION_THRESHOLD:
+            if _diag is not None:
+                _diag.append(_reject(rec, layer_name, "below_threshold"))
+            continue
+
+        records.append(rec)
+
     records.sort(key=lambda r: r["distance"])
+
+    if _diag is not None:
+        for r in records[limit:]:
+            _diag.append(_reject(r, layer_name, "over_bucket_limit"))
+
     return records[:limit]
 
 
@@ -305,8 +422,55 @@ def _recent_global_facts(limit: int) -> list[dict]:
         "value": r["value"], "source": r["source"],
         "created_at": r["created_at"],
     } for r in rows]
+def _load_topic_state(topic_id: int) -> list[dict]:
+    """Structured topic state as a single pseudo-record. Returns [] if
+    the state is empty or missing."""
+    from memory.topic_state import get_state, format_state_block
+    state = get_state(topic_id)
+    block = format_state_block(state)
+    if not block:
+        return []
+    return [{
+        "id": topic_id,
+        "kind": "topic_state",
+        "text": block,
+        "created_at": state.get("updated_at"),
+    }]
+def baseline_memory(session_id: Optional[int] = None) -> list[dict]:
+    """
+    Minimal always-injected memory: pinned facts + active topic state.
+    Everything else is retrieved on demand via the search_memory tool.
 
+    Returns a list of records already tagged with their layer, ready for
+    memory.inject.inject_into_messages().
+    """
+    records: list[dict] = []
 
+    try:
+        for r in _load_pinned():
+            r["layer"] = "pinned"
+            records.append(r)
+    except Exception as e:
+        print(f"⚠️ Pinned load failed: {e}")
 
+    context = _get_session_context(session_id)
+    topic_id = _extract_topic_id(context)
+    if topic_id is not None:
+        try:
+            for r in _load_topic_state(topic_id):
+                r["layer"] = "topic_state"
+                records.append(r)
+        except Exception as e:
+            print(f"⚠️ Topic state load failed: {e}")
+
+    return records
+LAYER_CAPS = {
+    "pinned": 300,
+    "topic_state": 400,
+    "topic_facts": 500,
+    "global_facts": 500,
+    "topic_sessions": 300,
+    "global_sessions": 300,
+}
 
 

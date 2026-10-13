@@ -2,15 +2,19 @@ import sys
 import os
 import time
 
+# Force CPU-only execution. Must be set BEFORE any torch or NeMo import —
+# otherwise CUDA initializes and the model loads onto the GPU regardless
+# of later .to("cpu") calls.
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 # Silence NeMo/Lhotse *before* anything imports them.
 os.environ["NEMO_LOG_LEVEL"] = "ERROR"
 os.environ["HYDRA_FULL_ERROR"] = "0"
-# Disables NeMo's transcribe() tqdm progress bar globally.
 os.environ["TQDM_DISABLE"] = "1"
 
 import logging
 import warnings
-
+# ... rest of file unchanged
 # NeMo's custom logger hierarchy doesn't always respect NEMO_LOG_LEVEL,
 # and Lhotse (a NeMo dependency) prints dataloader warnings at WARN level.
 for _name in (
@@ -41,7 +45,9 @@ def main():
         model = nemo_asr.models.ASRModel.from_pretrained(
             "nvidia/parakeet-tdt-0.6b-v2"
         )
+        model.to("cpu")
         model.eval()
+    
     except Exception as e:
         log(f"[stt_service] FATAL: model load failed: {e}")
         sys.exit(1)
