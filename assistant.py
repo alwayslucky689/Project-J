@@ -295,7 +295,8 @@ conversation = get_manager(
     max_turns=10,
 )
 personality_tools.init_personality_tools(personality_mgr)
-
+from tts.tts_manager import set_voice_provider
+set_voice_provider(lambda: personality_mgr.get_voice_sample())
 audio_pipeline = None  # type: AudioPipeline | None
 
 

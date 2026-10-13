@@ -6,3 +6,4 @@ make ai textbook problem scrape
 add hardstop with text
 add 1 fake prompt that doesnt get saved to warm up llm each run
 bonsai in chat mode talks too much with points etc make it more natural
+jarvis lost his personality since bonsai give it back

@@ -1,42 +1,4 @@
-[21:47:22.220] SESSION: 61 started
-[21:47:22.252] GPU monitor: pynvml
-[21:47:27.253] GPU: vram=6621/8192MB util=14%
-[21:47:32.255] GPU: vram=6608/8192MB util=7%
-[21:47:37.267] GPU: vram=7832/8192MB util=0%
-[21:47:42.268] GPU: vram=7832/8192MB util=0%
-[21:47:47.284] GPU: vram=7832/8192MB util=0%
-[21:47:52.288] GPU: vram=7832/8192MB util=0%
-[21:47:57.294] GPU: vram=7832/8192MB util=0%
-[21:48:02.301] GPU: vram=7833/8192MB util=0%
-[21:48:07.306] GPU: vram=7833/8192MB util=0%
-[21:48:12.307] GPU: vram=7833/8192MB util=0%
-[21:48:17.314] GPU: vram=7833/8192MB util=0%
-[21:48:22.320] GPU: vram=7846/8192MB util=0%
-[21:48:27.336] GPU: vram=7849/8192MB util=0%
-[21:48:32.319] ────: ────────────────────────────────────────────────────────────
-[21:48:32.319] USER: The Causes of World War One
-[21:48:32.336] GPU: vram=7913/8192MB util=1%
-[21:48:34.076] ROUTE: → chat (1757ms, conf=1.00, candidates=['chat'])
-[21:48:37.342] GPU: vram=7925/8192MB util=96%
-[21:48:42.347] GPU: vram=7922/8192MB util=95%
-[21:48:47.353] GPU: vram=7922/8192MB util=60%
-[21:48:52.358] GPU: vram=7922/8192MB util=0%
-[21:48:57.365] GPU: vram=7922/8192MB util=0%
-[21:49:02.371] GPU: vram=7922/8192MB util=0%
-[21:49:07.378] GPU: vram=7922/8192MB util=0%
-[21:49:12.385] GPU: vram=7922/8192MB util=2%
-[21:49:14.394] ────: ────────────────────────────────────────────────────────────
-[21:49:14.394] USER: Tell me about the causes of World War Two.
-[21:49:15.149] ROUTE: → chat (755ms, conf=1.00, candidates=['chat'])
-[21:49:17.391] GPU: vram=7938/8192MB util=96%
-[21:49:22.397] GPU: vram=7924/8192MB util=96%
-[21:49:27.404] GPU: vram=7924/8192MB util=96%
-[21:49:32.410] GPU: vram=7924/8192MB util=94%
-[21:49:37.417] GPU: vram=7924/8192MB util=96%
-[21:49:42.423] GPU: vram=7924/8192MB util=0%
-[21:49:44.854] ────: ────────────────────────────────────────────────────────────
-[21:49:44.854] USER: goodbye
-[21:49:45.790] ROUTE: → chat (937ms, conf=0.62)
-[21:49:47.430] GPU: vram=7924/8192MB util=33%
-[21:49:52.127] SESSION ended
-[21:49:52.298] SESSION ended
+[22:20:46.201] SESSION: 71 started
+[22:20:46.229] GPU monitor: pynvml
+[22:20:51.235] GPU: vram=7956/8192MB util=25%
+[22:20:51.544] SESSION ended
