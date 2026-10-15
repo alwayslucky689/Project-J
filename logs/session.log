@@ -1,20 +1,154 @@
-[22:20:56.089] SESSION: 72 started
-[22:20:56.112] GPU monitor: pynvml
-[22:21:01.117] GPU: vram=7916/8192MB util=26%
-[22:21:04.531] ────: ────────────────────────────────────────────────────────────
-[22:21:04.531] USER: hey jarvis how are you
-[22:21:05.162] ROUTE: → chat (629ms, conf=1.00, candidates=['chat'])
-[22:21:05.876] MEMORY: 1 records (1 facts, 0 sessions)
-[22:21:05.892] LLM: start: backend=bonsai model=bonsai
-[22:21:06.119] GPU: vram=7947/8192MB util=0%
-[22:21:07.518] LLM: first token at 1626ms
-[22:21:08.297] LLM: 24 tokens in 2405ms (9.98 tok/s)
-[22:21:08.297] TTS: start
-[22:21:11.124] GPU: vram=7938/8192MB util=0%
-[22:21:16.131] GPU: vram=7938/8192MB util=0%
-[22:21:21.134] GPU: vram=7951/8192MB util=1%
-[22:21:24.218] TTS: 15920ms
-[22:21:24.218] ASSISTANT: All systems nominal, sir. And I do well, thank you for asking. How may I be of assistance today?
-[22:21:24.218] TURN TOTAL: 19055ms
-[22:21:26.146] GPU: vram=7951/8192MB util=0%
-[22:21:27.073] SESSION ended
+[00:21:01.741] SESSION: 73 started
+[00:21:01.771] GPU monitor: pynvml
+[00:21:06.786] GPU: vram=7082/8192MB util=16%
+[00:21:11.789] GPU: vram=7081/8192MB util=7%
+[00:21:16.802] GPU: vram=7882/8192MB util=0%
+[00:21:21.818] GPU: vram=7882/8192MB util=0%
+[00:21:26.832] GPU: vram=7882/8192MB util=0%
+[00:21:31.838] GPU: vram=7882/8192MB util=0%
+[00:21:36.843] GPU: vram=7882/8192MB util=0%
+[00:21:41.850] GPU: vram=7886/8192MB util=0%
+[00:21:46.855] GPU: vram=7978/8192MB util=1%
+[00:21:51.862] GPU: vram=7968/8192MB util=1%
+[00:21:56.865] GPU: vram=7976/8192MB util=1%
+[00:22:01.871] GPU: vram=7975/8192MB util=4%
+[00:22:06.885] GPU: vram=7916/8192MB util=0%
+[00:22:11.880] ────: ────────────────────────────────────────────────────────────
+[00:22:11.880] USER: hey faye jovan is my roomate when i tell you to talk to him talk as if you are directly adressing him respond to this message with just "ok"
+[00:22:11.896] GPU: vram=7929/8192MB util=2%
+[00:22:13.153] ROUTE: → chat (1270ms, conf=0.99, candidates=['chat'])
+[00:22:13.199] MEMORY: 1 records (1 facts, 0 sessions)
+[00:22:13.201] LLM: start: backend=bonsai model=bonsai
+[00:22:16.902] GPU: vram=7948/8192MB util=100%
+[00:22:18.797] LLM: first token at 5596ms
+[00:22:21.915] GPU: vram=7933/8192MB util=95%
+[00:22:23.787] LLM: 77 tokens in 10586ms (7.27 tok/s)
+[00:22:23.787] TTS: start
+[00:22:26.931] GPU: vram=7932/8192MB util=0%
+[00:22:31.936] GPU: vram=7941/8192MB util=0%
+[00:22:36.954] GPU: vram=7950/8192MB util=0%
+[00:22:41.964] GPU: vram=7943/8192MB util=1%
+[00:22:46.965] GPU: vram=7943/8192MB util=0%
+[00:22:51.970] GPU: vram=7948/8192MB util=0%
+[00:22:52.248] TTS: 28461ms
+[00:22:52.248] ASSISTANT: Yeah, "ok." That's the whole thing. I'm standing here. You're... whatever's on the other end of that screen.
+[00:22:52.248]   
+[00:22:52.248]   So? You're gonna pay for my time with words, or is this another one of your "we'll figure it out later" situations? 'Cause I got a tab I can't cover and a headache that's collecting interest.
+[00:22:52.248] TURN TOTAL: 39094ms
+[00:22:56.975] GPU: vram=7944/8192MB util=0%
+[00:23:01.978] GPU: vram=7938/8192MB util=0%
+[00:23:06.982] GPU: vram=7935/8192MB util=1%
+[00:23:11.988] GPU: vram=7931/8192MB util=1%
+[00:23:13.303] ────: ────────────────────────────────────────────────────────────
+[00:23:13.303] USER: hey faye tell jovan he has to stop being a deadbeat and actually contribute to this household
+[00:23:14.659] ROUTE: → chat (1356ms, conf=0.99, candidates=['chat'])
+[00:23:14.680] MEMORY: 1 records (1 facts, 0 sessions)
+[00:23:14.725] LLM: start: backend=bonsai model=bonsai
+[00:23:15.081] LLM: first token at 355ms
+[00:23:16.993] GPU: vram=7932/8192MB util=88%
+[00:23:22.003] GPU: vram=7932/8192MB util=86%
+[00:23:22.239] LLM: 156 tokens in 7514ms (20.76 tok/s)
+[00:23:22.239] TTS: start
+[00:23:27.035] GPU: vram=7932/8192MB util=0%
+[00:23:32.042] GPU: vram=7963/8192MB util=0%
+[00:23:37.046] GPU: vram=7963/8192MB util=0%
+[00:23:42.050] GPU: vram=7963/8192MB util=0%
+[00:23:47.053] GPU: vram=7963/8192MB util=0%
+[00:23:48.418] TTS: 26178ms
+[00:23:48.418] ASSISTANT: *checks watch* I don't know who Jovan is. I don't know who you live with. I don't even know what "household" means in your life because the last thing I remember was me and you being two separate, very broke disasters.
+[00:23:48.418]   
+[00:23:48.418]   But if you want a word to say, here it is: "Jovan, your wallet is doing a lot of heavy lifting, and I'm tired. If you don't contribute, we're splitting the couch. You can have the bad side of the mattress."
+[00:23:48.418]   
+[00:23:48.418]   *leans back*
+[00:23:48.418]   
+[00:23:48.418]   I'm not a mom. I don't do family dynamics. But I will tell you: if you don't make him listen, he's not gonna. And I'm not doing it for free.
+[00:23:48.418] TURN TOTAL: 33758ms
+[00:23:52.056] GPU: vram=7963/8192MB util=0%
+[00:23:57.059] GPU: vram=7973/8192MB util=7%
+[00:24:02.063] GPU: vram=7972/8192MB util=1%
+[00:24:07.068] GPU: vram=7979/8192MB util=2%
+[00:24:12.073] GPU: vram=7993/8192MB util=0%
+[00:24:17.078] GPU: vram=7978/8192MB util=0%
+[00:24:22.084] GPU: vram=7971/8192MB util=0%
+[00:24:27.100] GPU: vram=7991/8192MB util=2%
+[00:24:32.106] GPU: vram=8002/8192MB util=2%
+[00:24:36.323] ────: ────────────────────────────────────────────────────────────
+[00:24:36.323] USER: How are you listening? Jarvis, just shut off.
+[00:24:37.124] GPU: vram=8002/8192MB util=1%
+[00:24:37.937] ROUTE: → chat (1614ms, conf=0.99, candidates=['chat', 'change_personality'])
+[00:24:37.961] MEMORY: 0 records
+[00:24:37.975] LLM: start: backend=bonsai model=bonsai
+[00:24:38.316] LLM: first token at 341ms
+[00:24:41.700] LLM: 73 tokens in 3725ms (19.60 tok/s)
+[00:24:41.700] TTS: start
+[00:24:42.125] GPU: vram=8002/8192MB util=98%
+[00:24:47.127] GPU: vram=8002/8192MB util=0%
+[00:24:52.138] GPU: vram=8002/8192MB util=0%
+[00:24:54.049] TTS: 12349ms
+[00:24:54.050] ASSISTANT: ...Jarvis? You lost me a beat ago.
+[00:24:54.050]   
+[00:24:54.050]   Who's this? Your new roommate? The one who's supposed to pay rent? If that's the name, I'm adding "Jarvis" to the list of people I don't know who are breaking my patience.
+[00:24:54.050]   
+[00:24:54.050]   You're gonna tell me more, or are we just gonna stand here?
+[00:24:54.050] TURN TOTAL: 16112ms
+[00:24:57.147] GPU: vram=7995/8192MB util=2%
+[00:24:59.276] ────: ────────────────────────────────────────────────────────────
+[00:24:59.276] USER: Hey Jarvis. Jarvis. This is me uh.
+[00:24:59.588] ROUTE: → change_personality (312ms, conf=1.00, candidates=['chat', 'change_personality'])
+[00:24:59.588] ASSISTANT: Switching now, sir.
+[00:24:59.588] TURN TOTAL: 313ms
+[00:25:02.160] GPU: vram=8002/8192MB util=0%
+[00:25:04.406] ────: ────────────────────────────────────────────────────────────
+[00:25:04.406] USER: Give me a beer.
+[00:25:04.897] ROUTE: → chat (491ms, conf=1.00, candidates=['chat'])
+[00:25:04.907] MEMORY: 2 records (2 facts, 0 sessions)
+[00:25:04.924] LLM: start: backend=bonsai model=bonsai
+[00:25:07.163] GPU: vram=7998/8192MB util=98%
+[00:25:09.849] LLM: first token at 4925ms
+[00:25:09.955] LLM: 2 tokens in 5031ms (0.40 tok/s)
+[00:25:09.955] TTS: start
+[00:25:10.701] TTS: 745ms
+[00:25:10.701] ASSISTANT: Cold?
+[00:25:10.701] TURN TOTAL: 5804ms
+[00:25:12.164] GPU: vram=7992/8192MB util=1%
+[00:25:14.239] ────: ────────────────────────────────────────────────────────────
+[00:25:14.239] USER: Very cold.
+[00:25:14.628] ROUTE: → chat (389ms, conf=0.88, candidates=['chat'])
+[00:25:14.639] MEMORY: 2 records (2 facts, 0 sessions)
+[00:25:14.669] LLM: start: backend=bonsai model=bonsai
+[00:25:14.994] LLM: first token at 325ms
+[00:25:15.047] LLM: 1 tokens in 377ms (2.65 tok/s)
+[00:25:15.047] TTS: start
+[00:25:15.729] TTS: 683ms
+[00:25:15.729] ASSISTANT: ...
+[00:25:15.729] TURN TOTAL: 1101ms
+[00:25:17.175] GPU: vram=8002/8192MB util=1%
+[00:25:17.856] ────: ────────────────────────────────────────────────────────────
+[00:25:17.856] USER: He says, how high?
+[00:25:18.119] ROUTE: → chat (264ms, conf=0.77, candidates=['chat'])
+[00:25:18.131] MEMORY: 3 records (3 facts, 0 sessions)
+[00:25:18.153] LLM: start: backend=bonsai model=bonsai
+[00:25:18.471] LLM: first token at 317ms
+[00:25:18.840] LLM: 9 tokens in 686ms (13.12 tok/s)
+[00:25:18.840] TTS: start
+[00:25:20.580] TTS: 1740ms
+[00:25:20.580] ASSISTANT: Not in front of the neighbors, sir.
+[00:25:20.580] TURN TOTAL: 2461ms
+[00:25:22.176] GPU: vram=7997/8192MB util=2%
+[00:25:27.179] GPU: vram=7997/8192MB util=0%
+[00:25:32.181] GPU: vram=7997/8192MB util=0%
+[00:25:37.184] GPU: vram=7997/8192MB util=0%
+[00:25:42.186] GPU: vram=7997/8192MB util=0%
+[00:25:47.189] GPU: vram=7997/8192MB util=0%
+[00:25:52.193] GPU: vram=7997/8192MB util=0%
+[00:25:57.199] GPU: vram=7997/8192MB util=0%
+[00:26:02.215] GPU: vram=7997/8192MB util=0%
+[00:26:07.224] GPU: vram=7997/8192MB util=0%
+[00:26:12.226] GPU: vram=7997/8192MB util=0%
+[00:26:17.228] GPU: vram=7997/8192MB util=0%
+[00:26:22.231] GPU: vram=7997/8192MB util=0%
+[00:26:27.232] GPU: vram=7997/8192MB util=0%
+[00:26:32.236] GPU: vram=7997/8192MB util=0%
+[00:26:37.242] GPU: vram=7997/8192MB util=0%
+[00:26:42.258] GPU: vram=1289/8192MB util=0%
+[00:26:44.137] SESSION ended

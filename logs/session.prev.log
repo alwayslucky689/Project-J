@@ -1,4 +1,20 @@
-[22:20:46.201] SESSION: 71 started
-[22:20:46.229] GPU monitor: pynvml
-[22:20:51.235] GPU: vram=7956/8192MB util=25%
-[22:20:51.544] SESSION ended
+[22:20:56.089] SESSION: 72 started
+[22:20:56.112] GPU monitor: pynvml
+[22:21:01.117] GPU: vram=7916/8192MB util=26%
+[22:21:04.531] ────: ────────────────────────────────────────────────────────────
+[22:21:04.531] USER: hey jarvis how are you
+[22:21:05.162] ROUTE: → chat (629ms, conf=1.00, candidates=['chat'])
+[22:21:05.876] MEMORY: 1 records (1 facts, 0 sessions)
+[22:21:05.892] LLM: start: backend=bonsai model=bonsai
+[22:21:06.119] GPU: vram=7947/8192MB util=0%
+[22:21:07.518] LLM: first token at 1626ms
+[22:21:08.297] LLM: 24 tokens in 2405ms (9.98 tok/s)
+[22:21:08.297] TTS: start
+[22:21:11.124] GPU: vram=7938/8192MB util=0%
+[22:21:16.131] GPU: vram=7938/8192MB util=0%
+[22:21:21.134] GPU: vram=7951/8192MB util=1%
+[22:21:24.218] TTS: 15920ms
+[22:21:24.218] ASSISTANT: All systems nominal, sir. And I do well, thank you for asking. How may I be of assistance today?
+[22:21:24.218] TURN TOTAL: 19055ms
+[22:21:26.146] GPU: vram=7951/8192MB util=0%
+[22:21:27.073] SESSION ended
