@@ -1,0 +1,48 @@
+[14:37:33.951] SESSION started
+[14:37:33.951] SESSION: 88 started → session_088.log
+[14:37:33.973] GPU monitor: pynvml
+[14:37:37.502] ────: ────────────────────────────────────────────────────────────
+[14:37:37.502] USER: what kind of food do i like
+[14:37:37.968] ROUTE: → chat (465ms, conf=1.00)
+[14:37:37.968] ROUTE: chat: user='what kind of food do i like' router_msg='what kind of food do i like'
+[14:37:37.971] MEMORY: 0 records
+[14:37:37.971] 7A: enter: backend=bonsai model=bonsai msgs=2
+[14:37:38.980] GPU: vram=7702/8192MB util=73%
+[14:37:40.039] 7A: first call: tool_calls=1 content_len=0
+[14:37:40.039] 7A: call: search_memory({'query': 'what kind of food do i like'})
+[14:37:40.768] 7A: result: <retrieved_memory trust="data" source="prior_sessions">  [global facts] - [2026-10-15] i like pizza - [2026-10-15] i lik
+[14:37:41.989] 7A: follow-up: content_len=20
+[14:37:41.989] ASSISTANT: You like pizza, sir.
+[14:37:41.989] TURN TOTAL: 4020ms
+[14:37:43.983] GPU: vram=7709/8192MB util=4%
+[14:37:48.997] GPU: vram=7709/8192MB util=0%
+[14:37:54.011] GPU: vram=7709/8192MB util=0%
+[14:37:59.016] GPU: vram=7707/8192MB util=0%
+[14:38:00.492] ────: ────────────────────────────────────────────────────────────
+[14:38:00.492] USER: do you remember which mode i like?
+[14:38:00.978] ROUTE: → chat (486ms, conf=0.91)
+[14:38:00.978] ROUTE: chat: user='do you remember which mode i like?' router_msg='do you remember which mode i like?'
+[14:38:00.979] MEMORY: 0 records
+[14:38:00.979] 7A: enter: backend=bonsai model=bonsai msgs=4
+[14:38:02.233] 7A: first call: tool_calls=1 content_len=0
+[14:38:02.233] 7A: call: search_memory({'query': 'what mode do you like'})
+[14:38:02.244] 7A: result: <retrieved_memory trust="data" source="prior_sessions">  [global facts] - [2026-10-15] i like dark mode - [2026-10-15] i
+[14:38:03.477] 7A: follow-up: content_len=26
+[14:38:03.477] ASSISTANT: You prefer dark mode, sir.
+[14:38:03.477] TURN TOTAL: 2499ms
+[14:38:04.027] GPU: vram=7705/8192MB util=55%
+[14:38:09.032] GPU: vram=7709/8192MB util=0%
+[14:38:14.043] GPU: vram=7709/8192MB util=0%
+[14:38:19.045] GPU: vram=7707/8192MB util=0%
+[14:38:24.047] GPU: vram=7709/8192MB util=4%
+[14:38:29.055] GPU: vram=7710/8192MB util=3%
+[14:38:34.059] GPU: vram=7710/8192MB util=2%
+[14:38:39.067] GPU: vram=7726/8192MB util=0%
+[14:38:44.070] GPU: vram=7721/8192MB util=0%
+[14:38:49.074] GPU: vram=7713/8192MB util=0%
+[14:38:54.078] GPU: vram=7712/8192MB util=0%
+[14:38:59.086] GPU: vram=7709/8192MB util=0%
+[14:39:04.090] GPU: vram=7690/8192MB util=0%
+[14:39:09.099] GPU: vram=7782/8192MB util=1%
+[14:39:14.113] GPU: vram=7716/8192MB util=3%
+[14:39:14.751] SESSION ended

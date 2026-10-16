@@ -1,0 +1,48 @@
+[15:57:07.522] SESSION started
+[15:57:07.521] WORKER: loop entered
+[15:57:07.522] SESSION: 99 started → session_099.log
+[15:57:07.552] GPU monitor: pynvml
+[15:57:11.273] ────: ────────────────────────────────────────────────────────────
+[15:57:11.273] USER: i hate thunderstorms
+[15:57:11.871] ROUTE: → chat (597ms, conf=0.94, candidates=['chat'])
+[15:57:11.871] ROUTE: chat: user='i hate thunderstorms' router_msg='Thunderstorms'
+[15:57:11.874] MEMORY: 0 records
+[15:57:11.874] LLM: start: backend=bonsai model=bonsai
+[15:57:12.191] LLM: first token at 317ms
+[15:57:12.563] GPU: vram=7735/8192MB util=50%
+[15:57:13.200] LLM: 41 tokens in 1326ms (30.92 tok/s)
+[15:57:13.200] ASSISTANT: I understand. If the weather proves inconvenient, the workshop's ventilation systems and the study's blackout drapes are all calibrated and ready to minimise the sensory intrusion. Shall I have the lighting dimmed accordingly?
+[15:57:13.200] TURN TOTAL: 1328ms
+[15:57:16.738] ────: ────────────────────────────────────────────────────────────
+[15:57:16.738] USER: i love cold weather
+[15:57:16.993] ROUTE: → chat (255ms, conf=1.00, candidates=['chat'])
+[15:57:16.993] ROUTE: chat: user='i love cold weather' router_msg='Cold weather'
+[15:57:16.993] MEMORY: 0 records
+[15:57:16.993] LLM: start: backend=bonsai model=bonsai
+[15:57:17.311] LLM: first token at 316ms
+[15:57:17.568] GPU: vram=7719/8192MB util=44%
+[15:57:18.185] LLM: 36 tokens in 1190ms (30.25 tok/s)
+[15:57:18.185] ASSISTANT: I note that. I’ll adjust the heating to a more tolerable level and ensure the wool blankets are ready. I trust you’ll find the draft from the conservatory acceptable.
+[15:57:18.185] TURN TOTAL: 1193ms
+[15:57:22.572] GPU: vram=7719/8192MB util=0%
+[15:57:24.450] ────: ────────────────────────────────────────────────────────────
+[15:57:24.450] USER: i prefer spicy ramen to bland one
+[15:57:24.610] ROUTE: → chat (159ms, conf=1.00)
+[15:57:24.610] ROUTE: chat: user='i prefer spicy ramen to bland one' router_msg='i prefer spicy ramen to bland one'
+[15:57:24.610] MEMORY: 0 records
+[15:57:24.610] LLM: start: backend=bonsai model=bonsai
+[15:57:24.929] LLM: first token at 318ms
+[15:57:25.956] LLM: 41 tokens in 1345ms (30.48 tok/s)
+[15:57:25.956] ASSISTANT: Noted. I’ll have the kitchen prepare a broth with a more assertive profile — a touch of miso and a generous measure of chili oil. Shall I have the noodles cooked al dente?
+[15:57:25.956] TURN TOTAL: 1346ms
+[15:57:27.580] GPU: vram=7719/8192MB util=36%
+[15:57:32.584] GPU: vram=7737/8192MB util=0%
+[15:57:35.638] WORKER: idle: checkpoint=535 pending=0
+[15:57:37.588] GPU: vram=7748/8192MB util=2%
+[15:57:42.589] GPU: vram=7743/8192MB util=0%
+[15:57:47.603] GPU: vram=7743/8192MB util=0%
+[15:57:52.608] GPU: vram=7743/8192MB util=0%
+[15:57:57.616] GPU: vram=7742/8192MB util=0%
+[15:58:02.625] GPU: vram=7743/8192MB util=4%
+[15:58:03.242] WORKER: stop requested; finishing current batch
+[15:58:03.553] SESSION ended

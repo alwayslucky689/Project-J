@@ -73,8 +73,6 @@ Assistant: {"tool": "change_personality", "name": "faye"}
 User: "what is the weather"
 Assistant: {"tool": "chat", "message": "what is the weather?"}
 
-User: "tell me a joke"
-Assistant: {"tool": "chat", "message": "tell me a joke"}
 
 User: {user_input}
 Assistant:"""

@@ -1,0 +1,54 @@
+[14:33:04.186] SESSION started
+[14:33:04.186] SESSION: 87 started → session_087.log
+[14:33:04.208] GPU monitor: pynvml
+[14:33:06.590] ────: ────────────────────────────────────────────────────────────
+[14:33:06.590] USER: hey jarvis how are you
+[14:33:07.336] ROUTE: → chat (744ms, conf=1.00, candidates=['chat'])
+[14:33:07.336] ROUTE: chat: user='how are you' router_msg='How are you'
+[14:33:07.340] MEMORY: 0 records
+[14:33:07.340] LLM: start: backend=bonsai model=bonsai
+[14:33:07.746] LLM: first token at 406ms
+[14:33:08.093] LLM: 13 tokens in 753ms (17.27 tok/s)
+[14:33:08.093] ASSISTANT: All systems nominal, sir. How may I be of assistance?
+[14:33:08.093] TURN TOTAL: 755ms
+[14:33:09.220] GPU: vram=7714/8192MB util=14%
+[14:33:14.229] GPU: vram=7825/8192MB util=0%
+[14:33:17.362] ────: ────────────────────────────────────────────────────────────
+[14:33:17.362] USER: tell me a joke
+[14:33:17.586] ROUTE: → chat (224ms, conf=1.00, candidates=['chat'])
+[14:33:17.586] ROUTE: chat: user='tell me a joke' router_msg='Message'
+[14:33:17.586] MEMORY: 0 records
+[14:33:17.586] LLM: start: backend=bonsai model=bonsai
+[14:33:17.896] LLM: first token at 308ms
+[14:33:19.008] LLM: 45 tokens in 1420ms (31.69 tok/s)
+[14:33:19.008] ASSISTANT: I’m afraid I’d have to pass on that, sir. My circuits are rather more inclined to structural integrity than slapstick, and the last one I processed had a 47% chance of causing a security breach.
+[14:33:19.008] TURN TOTAL: 1422ms
+[14:33:19.241] GPU: vram=7822/8192MB util=92%
+[14:33:24.254] GPU: vram=7819/8192MB util=0%
+[14:33:29.263] GPU: vram=7819/8192MB util=0%
+[14:33:34.276] GPU: vram=7807/8192MB util=0%
+[14:33:35.385] ────: ────────────────────────────────────────────────────────────
+[14:33:35.385] USER: what did i say about pizza
+[14:33:35.604] ROUTE: → chat (219ms, conf=1.00)
+[14:33:35.604] ROUTE: chat: user='what did i say about pizza' router_msg='what did i say about pizza'
+[14:33:35.604] MEMORY: 0 records
+[14:33:35.604] 7A: enter: backend=bonsai model=bonsai msgs=6
+[14:33:38.395] 7A: first call: tool_calls=1 content_len=51
+[14:33:38.395] 7A: call: search_memory({'query': 'pizza'})
+[14:33:39.151] 7A: result: <retrieved_memory trust="data" source="prior_sessions">  [global facts] - [2026-10-15] i like pizza - [2026-10-02] pizza
+[14:33:39.291] GPU: vram=7807/8192MB util=27%
+[14:33:40.857] 7A: follow-up: content_len=183
+[14:33:40.857] ASSISTANT: You've mentioned you like pizza, sir, on several occasions. I take note of your preferences, however, I've yet to log a specific order or instruction. Shall I prepare one for tonight?
+[14:33:40.857] TURN TOTAL: 5253ms
+[14:33:44.295] GPU: vram=7807/8192MB util=0%
+[14:33:49.308] GPU: vram=7807/8192MB util=1%
+[14:33:49.739] ────: ────────────────────────────────────────────────────────────
+[14:33:49.739] USER: do you remember which mode i like?
+[14:33:49.949] ROUTE: → chat (210ms, conf=0.91)
+[14:33:49.949] ROUTE: chat: user='do you remember which mode i like?' router_msg='do you remember which mode i like?'
+[14:33:49.949] MEMORY: 0 records
+[14:33:49.949] 7A: enter: backend=bonsai model=bonsai msgs=8
+[14:33:51.372] 7A: first call: tool_calls=0 content_len=78
+[14:33:51.373] ASSISTANT: I'm afraid I'd need a little more detail, sir. What mode are you referring to?
+[14:33:51.373] TURN TOTAL: 1424ms
+[14:33:53.561] SESSION ended

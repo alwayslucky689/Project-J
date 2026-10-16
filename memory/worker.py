@@ -6,7 +6,7 @@
 #
 # For 6e-1, it just logs what it sees. This validates the trigger logic
 # and checkpoint mechanism before adding the extraction pipeline.
-
+from debug import debug_log as dbg
 import threading
 import time
 
@@ -16,13 +16,11 @@ from memory.sessions import (
     _load_checkpoint,
 )
 from config import settings
-
+def _log(msg: str):
+    dbg.event("WORKER", msg)
 
 def _log(msg: str):
-    """Worker diagnostics only print when TIMING is on, so they don't
-    interrupt the terminal prompt."""
-    if getattr(settings, "TIMING", False):
-        print(msg)
+    dbg.event("WORKER", msg)
 
 # Trigger thresholds
 TURNS_PER_BATCH = 3        # Run after this many new turns
@@ -49,10 +47,19 @@ class _Worker:
         self._thread.start()
        
 
-    def stop(self, timeout: float = 3.0):
+    def stop(self, timeout: float = 60.0):
+        """Stop the worker. Waits for any in-flight batch to complete so
+        extraction events reach disk before the process exits. Extraction
+        calls the LLM once per hard turn, so a batch can take 15-30s."""
+        if not self._stop.is_set():
+            dbg.event("WORKER", "stop requested; finishing current batch")
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                dbg.event("WORKER",
+                          f"stop timed out after {timeout}s; "
+                          f"thread still running")
         
 
     def notify_activity(self):
@@ -62,22 +69,37 @@ class _Worker:
     # ---- Loop ----
 
     def _loop(self):
+        dbg.event("WORKER", "loop entered")
+        idle_logs = 0
         while not self._stop.is_set():
             try:
                 if self._should_run():
+                    dbg.event("WORKER", "should_run=True")
                     self._run_batch()
+                else:
+                    idle_logs += 1
+                    # Log once every ~30s that we're alive and polling.
+                    if idle_logs % 15 == 0:
+                        from memory.sessions import _load_checkpoint
+                        ck = _load_checkpoint()
+                        last_id = ck.get("last_processed_turn_id", 0)
+                        pending = get_unprocessed_turns(
+                            limit=TURNS_PER_BATCH + 1
+                        )
+                        dbg.event(
+                            "WORKER",
+                            f"idle: checkpoint={last_id} "
+                            f"pending={len(pending)}"
+                        )
 
-                # Summary queue is drained independently — it doesn't
-                # wait for the extraction trigger.
+                if self._stop.is_set():
+                    break
                 self._drain_summaries()
-
             except Exception as e:
-                print(f"⚠️ Worker error: {e}")
+                dbg.event("WORKER", f"loop error: {e}")
                 self._sleep(FAILURE_BACKOFF_SECONDS)
                 continue
-
             self._sleep(POLL_INTERVAL)
-
     def _drain_summaries(self):
         from memory.sessions import pop_pending_summary
         while True:
@@ -131,29 +153,35 @@ class _Worker:
         return False
 
     def _run_batch(self):
+        dbg.event("WORKER", ">>> RUN_BATCH ENTERED <<<")
         pending = get_unprocessed_turns(limit=50)
+        dbg.event("WORKER", f">>> got {len(pending)} turns <<<")
         if not pending:
             return
 
-        # Extract (may fail cleanly if models unavailable)
+        dbg.event("WORKER", f"batch: {len(pending)} pending turns")
+
         try:
             from memory.extract import extract_candidates
             raw = extract_candidates(pending)
+            dbg.event("WORKER", f"extract: {len(raw)} candidates")
         except Exception as e:
-            _log(f"⚠️ Extraction crashed: {e}")
+            dbg.event("WORKER", f"extract crashed: {e}")
             raw = []
 
-        # Validate
         kept = []
         for c in raw:
-            # Attach the source text for validation context
             c["source_text"] = c.get("text", "")
             from memory.validate import validate_candidate
             ok, revised, reason = validate_candidate(c)
             if ok:
                 kept.append(revised)
+            else:
+                dbg.event("WORKER", f"validate rejected: {reason} | "
+                                    f"{c.get('text','?')[:60]}")
 
-        # Resolve + write
+        dbg.event("WORKER", f"validate: {len(kept)}/{len(raw)} kept")
+
         actions = {}
         for c in kept:
             try:
@@ -161,12 +189,14 @@ class _Worker:
                 action = resolve_candidate(c)
                 actions[action] = actions.get(action, 0) + 1
             except Exception as e:
-                _log(f"⚠️ Resolve failed for {c.get('text','?')}: {e}")
+                dbg.event("WORKER", f"resolve failed: {e} | "
+                                    f"{c.get('text','?')[:60]}")
 
         if actions:
-            _log(f"🧠 Extracted {sum(actions.values())} fact(s): {actions}")
+            dbg.event("WORKER", f"resolved: {actions}")
+        else:
+            dbg.event("WORKER", "resolved: no actions")
 
-        # Advance checkpoint — only after successful processing
         highest_id = max(t["id"] for t in pending)
         checkpoint = _load_checkpoint()
         checkpoint["last_processed_turn_id"] = highest_id
@@ -199,10 +229,9 @@ def get_worker() -> _Worker:
 def start_worker():
     get_worker().start()
 
-
 def stop_worker():
     if _worker is not None:
-        _worker.stop()
+        _worker.stop(timeout=60.0)
 
 
 def notify_activity():

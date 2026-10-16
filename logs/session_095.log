@@ -1,0 +1,50 @@
+[15:38:31.526] SESSION started
+[15:38:31.526] SESSION: 95 started → session_095.log
+[15:38:31.556] GPU monitor: pynvml
+[15:38:36.571] GPU: vram=7741/8192MB util=0%
+[15:38:41.586] GPU: vram=7741/8192MB util=0%
+[15:38:44.376] ────: ────────────────────────────────────────────────────────────
+[15:38:44.376] USER: hey how are you
+[15:38:44.968] ROUTE: → chat (591ms, conf=1.00, candidates=['chat'])
+[15:38:44.968] ROUTE: chat: user='hey how are you' router_msg='How are you'
+[15:38:44.971] MEMORY: 0 records
+[15:38:44.971] LLM: start: backend=bonsai model=bonsai
+[15:38:45.439] LLM: first token at 468ms
+[15:38:45.676] LLM: 9 tokens in 705ms (12.77 tok/s)
+[15:38:45.677] ASSISTANT: Perfectly functional, sir. And you?
+[15:38:45.677] TURN TOTAL: 707ms
+[15:38:46.594] GPU: vram=7725/8192MB util=15%
+[15:38:48.925] ────: ────────────────────────────────────────────────────────────
+[15:38:48.925] USER: what food should i get
+[15:38:49.066] ROUTE: → chat (141ms, conf=1.00)
+[15:38:49.066] ROUTE: chat: user='what food should i get' router_msg='what food should i get'
+[15:38:49.066] MEMORY: 0 records
+[15:38:49.066] 7A: enter: backend=bonsai model=bonsai msgs=4
+[15:38:50.612] 7A: first call: tool_calls=1 content_len=0
+[15:38:50.612] 7A: call: search_memory({'query': 'food preferences diet likes dislikes'})
+[15:38:51.402] 7A: result: <retrieved_memory trust="data" source="prior_sessions">  [global facts] - [2026-10-15] i like pizza - [2026-10-15] The u
+[15:38:51.606] GPU: vram=7732/8192MB util=9%
+[15:38:53.024] 7A: follow-up: content_len=162
+[15:38:53.026] ASSISTANT: Given your vegetarian preference, a vegetable pizza sounds reasonable, sir. Alternatively, noodles would satisfy as well. I can check local options if you'd like.
+[15:38:53.026] TURN TOTAL: 3960ms
+[15:38:56.608] GPU: vram=7737/8192MB util=0%
+[15:39:01.622] GPU: vram=7737/8192MB util=0%
+[15:39:06.625] GPU: vram=7727/8192MB util=0%
+[15:39:11.625] GPU: vram=7725/8192MB util=0%
+[15:39:12.027] ────: ────────────────────────────────────────────────────────────
+[15:39:12.027] USER: i prefer konjak noodles to regular ones
+[15:39:12.578] ROUTE: → chat (551ms, conf=0.98, candidates=['chat'])
+[15:39:12.578] ROUTE: chat: user='i prefer konjak noodles to regular ones' router_msg='Regular ones'
+[15:39:12.578] MEMORY: 0 records
+[15:39:12.578] LLM: start: backend=bonsai model=bonsai
+[15:39:13.082] LLM: first token at 503ms
+[15:39:13.499] LLM: 16 tokens in 921ms (17.37 tok/s)
+[15:39:13.500] ASSISTANT: Noted, sir. I shall ensure your order consists of konjak noodles.
+[15:39:13.500] TURN TOTAL: 922ms
+[15:39:13.683] WORKER: batch: 4 pending turns
+[15:39:15.126] WORKER: extract: 1 candidates
+[15:39:15.129] WORKER: loop error: cannot access local variable 'value' where it is not associated with a value
+[15:39:16.640] GPU: vram=7745/8192MB util=6%
+[15:39:21.643] GPU: vram=7740/8192MB util=0%
+[15:39:23.701] WORKER: stop requested; finishing current batch
+[15:39:24.005] SESSION ended

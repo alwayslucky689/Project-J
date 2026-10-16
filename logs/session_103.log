@@ -1,0 +1,25 @@
+[16:13:52.606] SESSION started
+[16:13:52.605] WORKER: loop entered
+[16:13:52.605] WORKER: should_run=True
+[16:13:52.605] WORKER: >>> RUN_BATCH ENTERED <<<
+[16:13:52.605] WORKER: >>> got 6 turns <<<
+[16:13:52.605] WORKER: batch: 6 pending turns
+[16:13:52.606] SESSION: 103 started → session_103.log
+[16:13:52.637] GPU monitor: pynvml
+[16:13:54.126] WORKER: extract: 3 candidates
+[16:13:54.127] WORKER: loop error: cannot access local variable 'value' where it is not associated with a value
+[16:13:57.641] GPU: vram=7710/8192MB util=24%
+[16:14:02.642] GPU: vram=7710/8192MB util=0%
+[16:14:06.039] ────: ────────────────────────────────────────────────────────────
+[16:14:06.039] USER: how are you
+[16:14:06.599] ROUTE: → chat (559ms, conf=1.00, candidates=['chat'])
+[16:14:06.599] ROUTE: chat: user='how are you' router_msg='How are you'
+[16:14:06.602] MEMORY: 0 records
+[16:14:06.602] LLM: start: backend=bonsai model=bonsai
+[16:14:07.402] LLM: first token at 800ms
+[16:14:07.665] GPU: vram=7706/8192MB util=49%
+[16:14:07.788] LLM: 15 tokens in 1186ms (12.64 tok/s)
+[16:14:07.789] ASSISTANT: All systems are within nominal parameters, sir. I am at your disposal.
+[16:14:07.789] TURN TOTAL: 1188ms
+[16:14:10.072] WORKER: stop requested; finishing current batch
+[16:14:10.700] SESSION ended

@@ -1,0 +1,64 @@
+[15:25:53.376] SESSION started
+[15:25:53.376] SESSION: 93 started → session_093.log
+[15:25:53.400] GPU monitor: pynvml
+[15:25:58.406] GPU: vram=7740/8192MB util=0%
+[15:25:58.463] ────: ────────────────────────────────────────────────────────────
+[15:25:58.463] USER: hey how are you
+[15:25:59.101] ROUTE: → chat (637ms, conf=1.00, candidates=['chat'])
+[15:25:59.101] ROUTE: chat: user='hey how are you' router_msg='How are you'
+[15:25:59.104] MEMORY: 0 records
+[15:25:59.104] LLM: start: backend=bonsai model=bonsai
+[15:25:59.383] LLM: first token at 279ms
+[15:25:59.646] LLM: 10 tokens in 541ms (18.47 tok/s)
+[15:25:59.646] ASSISTANT: Excellent, thank you. And you, sir?
+[15:25:59.646] TURN TOTAL: 543ms
+[15:26:03.410] GPU: vram=7725/8192MB util=0%
+[15:26:08.425] GPU: vram=7725/8192MB util=0%
+[15:26:13.436] GPU: vram=7725/8192MB util=0%
+[15:26:18.452] GPU: vram=7725/8192MB util=0%
+[15:26:23.452] GPU: vram=7725/8192MB util=0%
+[15:26:27.488] ────: ────────────────────────────────────────────────────────────
+[15:26:27.488] USER: im okay i realized that reading other peoples handwriting is a pain in the ass
+[15:26:28.116] ROUTE: → chat (628ms, conf=1.00, candidates=['chat'])
+[15:26:28.116] ROUTE: chat: user='im okay i realized that reading other peoples handwriting is a pain in the ass' router_msg='Reading other peoples handwriting is a pain in the ass'
+[15:26:28.116] MEMORY: 0 records
+[15:26:28.116] LLM: start: backend=bonsai model=bonsai
+[15:26:28.434] LLM: first token at 317ms
+[15:26:28.461] GPU: vram=7725/8192MB util=0%
+[15:26:28.986] LLM: 22 tokens in 869ms (25.31 tok/s)
+[15:26:28.986] ASSISTANT: I suspect your handwriting would present considerably more challenges. Shall I arrange for the optical scanners to run a calibration?
+[15:26:28.986] TURN TOTAL: 870ms
+[15:26:33.462] GPU: vram=7725/8192MB util=0%
+[15:26:38.465] GPU: vram=7725/8192MB util=0%
+[15:26:43.478] GPU: vram=7725/8192MB util=0%
+[15:26:48.483] GPU: vram=7725/8192MB util=0%
+[15:26:53.496] GPU: vram=7725/8192MB util=0%
+[15:26:54.758] ────: ────────────────────────────────────────────────────────────
+[15:26:54.758] USER: ive grown a fondness for plants
+[15:26:54.912] ROUTE: → chat (154ms, conf=1.00)
+[15:26:54.912] ROUTE: chat: user='ive grown a fondness for plants' router_msg='ive grown a fondness for plants'
+[15:26:54.912] MEMORY: 0 records
+[15:26:54.912] LLM: start: backend=bonsai model=bonsai
+[15:26:55.268] LLM: first token at 356ms
+[15:26:55.573] LLM: 12 tokens in 661ms (18.16 tok/s)
+[15:26:55.574] ASSISTANT: A welcome development. I shall note the greenhouse schedule accordingly.
+[15:26:55.574] TURN TOTAL: 661ms
+[15:26:55.582] WORKER: batch: 4 pending turns
+[15:26:57.927] WORKER: extract: 0 candidates
+[15:26:57.927] WORKER: validate: 0/0 kept
+[15:26:57.927] WORKER: resolved: no actions
+[15:26:58.508] GPU: vram=7725/8192MB util=28%
+[15:27:03.550] GPU: vram=7725/8192MB util=0%
+[15:27:06.281] ────: ────────────────────────────────────────────────────────────
+[15:27:06.281] USER: i like hanging plants the most
+[15:27:06.764] ROUTE: → chat (482ms, conf=0.99, candidates=['chat'])
+[15:27:06.764] ROUTE: chat: user='i like hanging plants the most' router_msg='Hanging plants the most'
+[15:27:06.764] MEMORY: 0 records
+[15:27:06.764] LLM: start: backend=bonsai model=bonsai
+[15:27:07.184] LLM: first token at 419ms
+[15:27:07.675] LLM: 20 tokens in 911ms (21.96 tok/s)
+[15:27:07.676] ASSISTANT: Understood. I'll ensure the ceiling mounts in the east corridor are reinforced before your next delivery.
+[15:27:07.676] TURN TOTAL: 912ms
+[15:27:08.558] GPU: vram=7725/8192MB util=66%
+[15:27:09.830] WORKER: stop requested; finishing current batch
+[15:27:10.146] SESSION ended

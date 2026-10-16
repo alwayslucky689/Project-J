@@ -1,0 +1,47 @@
+[16:09:24.837] SESSION started
+[16:09:24.836] WORKER: loop entered
+[16:09:24.837] SESSION: 101 started → session_101.log
+[16:09:24.840] WORKER: 📝 Summarized session 76: Error: Ollama returned HTTP 404...
+[16:09:24.858] GPU monitor: pynvml
+[16:09:28.789] ────: ────────────────────────────────────────────────────────────
+[16:09:28.789] USER: i love zelda
+[16:09:29.766] ROUTE: → chat (975ms, conf=1.00, candidates=['chat'])
+[16:09:29.766] ROUTE: chat: user='i love zelda' router_msg='Zelda'
+[16:09:29.769] MEMORY: 0 records
+[16:09:29.770] LLM: start: backend=bonsai model=bonsai
+[16:09:29.862] GPU: vram=7721/8192MB util=17%
+[16:09:30.560] LLM: first token at 791ms
+[16:09:31.167] LLM: 24 tokens in 1398ms (17.17 tok/s)
+[16:09:31.167] ASSISTANT: Noted, sir. Shall I suggest a soundtrack, or perhaps investigate which installation of the series requires the most patience?
+[16:09:31.167] TURN TOTAL: 1399ms
+[16:09:34.662] ────: ────────────────────────────────────────────────────────────
+[16:09:34.662] USER: i prefer cats to dogs
+[16:09:34.891] GPU: vram=7714/8192MB util=0%
+[16:09:34.900] ROUTE: → chat (238ms, conf=1.00, candidates=['chat'])
+[16:09:34.900] ROUTE: chat: user='i prefer cats to dogs' router_msg='Cats to dogs'
+[16:09:34.901] MEMORY: 0 records
+[16:09:34.901] LLM: start: backend=bonsai model=bonsai
+[16:09:35.205] LLM: first token at 304ms
+[16:09:35.343] LLM: 5 tokens in 443ms (11.30 tok/s)
+[16:09:35.344] ASSISTANT: Agreed, sir.
+[16:09:35.344] TURN TOTAL: 443ms
+[16:09:36.909] WORKER: should_run=True
+[16:09:36.909] WORKER: >>> RUN_BATCH ENTERED <<<
+[16:09:36.909] WORKER: >>> got 4 turns <<<
+[16:09:36.909] WORKER: batch: 4 pending turns
+[16:09:38.404] WORKER: extract: 2 candidates
+[16:09:38.406] WORKER: loop error: cannot access local variable 'value' where it is not associated with a value
+[16:09:39.200] ────: ────────────────────────────────────────────────────────────
+[16:09:39.200] USER: i like evenings
+[16:09:39.433] ROUTE: → chat (233ms, conf=1.00, candidates=['chat'])
+[16:09:39.433] ROUTE: chat: user='i like evenings' router_msg='Message'
+[16:09:39.433] MEMORY: 0 records
+[16:09:39.433] LLM: start: backend=bonsai model=bonsai
+[16:09:39.747] LLM: first token at 313ms
+[16:09:39.895] GPU: vram=7706/8192MB util=3%
+[16:09:40.030] LLM: 11 tokens in 596ms (18.45 tok/s)
+[16:09:40.030] ASSISTANT: Noted, sir. Shall I dim the lights?
+[16:09:40.030] TURN TOTAL: 597ms
+[16:09:44.906] GPU: vram=7706/8192MB util=0%
+[16:09:46.391] WORKER: stop requested; finishing current batch
+[16:09:47.016] SESSION ended

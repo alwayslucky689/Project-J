@@ -1,3 +1,9 @@
+import sys as _sys
+try:
+    _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    _sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 import threading
 from debug import debug_log as dbg
 from memory.classifier import needs_memory_lookup
@@ -28,9 +34,46 @@ from memory.sessions import (
 from memory.worker import start_worker, stop_worker, notify_activity
 from tools import (youtube, spotify, discord, ollama, ookla,
                    personality_tools, tts_tools, memory_tools)
-from core.cancel import CancelToken, set_current, get_current
-import msvcrt
+from core.cancel import (
+    CancelToken, set_current, get_current,
+    start_listener as start_cancel_listener,
+    stop_listener as stop_cancel_listener,
+)
+# Explicit "save this fact" phrasing. Matches only when a save verb is
+# followed by a clause-introducer ("that", "this", "to", "I", ...).
+# Bare "remember X" is ambiguous ("remember the pizza thing" could be
+# a query) and falls through to the normal router.
+_EXPLICIT_SAVE = re.compile(
+    r"^\s*(?:remember|note|save|keep\s+in\s+mind|"
+    r"don'?t\s+forget)\s+"
+    r"(?:that\s+|this\s+|to\s+|i\s+|i'm\s+|i\s+am\s+)"
+    r"(.+)$",
+    re.IGNORECASE,
+)
 
+_TOOL_PATH_HINT = (
+    "The user's query has been flagged as likely relevant to their stored "
+    "memory. You have a `search_memory` tool available. Call it BEFORE "
+    "asking for clarification, before saying you don't know, and before "
+    "answering from training data. Memory is more likely to contain the "
+    "answer than your general knowledge. If the tool returns nothing "
+    "relevant, then ask for clarification. Do not ask the user to "
+    "elaborate until you have checked memory first."
+)
+def _try_explicit_save(query: str):
+    """
+    Short-circuit explicit save phrases straight to remember_fact.
+    Needle is unreliable when the candidate set is two tools; don't
+    route an unambiguous save through it.
+    """
+    m = _EXPLICIT_SAVE.match(query)
+    if not m:
+        return None
+    fact = m.group(1).strip().rstrip(".!?")
+    if not fact:
+        return None
+    result = execute_single_action({"tool": "remember_fact", "fact": fact})
+    return AssistantResponse(text=result, was_streamed=False)
 
 def _build_chat_system_prompt(query: str) -> str:
     """
@@ -372,22 +415,6 @@ def _try_nl_topic_activation(user_input: str):
     return response
 
 
-def _poll_for_cancel() -> bool:
-    """
-    Non-blocking check for Esc. Drains any pending keys so they don't
-    leak into the next input() call. Returns True if Esc was pressed.
-    """
-    found = False
-    try:
-        while msvcrt.kbhit():
-            ch = msvcrt.getwch()
-            if ch == "\x1b":   # Esc — VS Code doesn't steal this the way it
-                               # steals Ctrl+F (which opens its search box)
-                found = True
-    except Exception:
-        pass
-    return found
-
 
 from memory.sessions import get_or_create_session
 
@@ -439,7 +466,14 @@ def route_request(user_input: str) -> AssistantResponse:
         dbg.assistant(result)
         dbg.turn_end((time.perf_counter() - t0) * 1000)
         return AssistantResponse(text=result, was_streamed=False)
-
+    save_response = _try_explicit_save(user_input)
+    if save_response is not None:
+        dbg.route("explicit_save", (time.perf_counter() - t0) * 1000)
+        _persist_turn("user", user_input, sid)
+        _persist_turn("assistant", save_response.text, sid)
+        dbg.assistant(save_response.text)
+        dbg.turn_end((time.perf_counter() - t0) * 1000)
+        return save_response
     if settings.USE_NEEDLE_ROUTER:
         t_route = time.perf_counter()
         decision = route_to_tool(user_input)
@@ -458,12 +492,12 @@ def route_request(user_input: str) -> AssistantResponse:
     dbg.route(tool_name or "?", route_ms, conf, candidates)
 
     if not isinstance(decision, dict) or decision.get("tool") == "chat":
-        question = user_input
-        if isinstance(decision, dict):
-            question = decision.get("message") or user_input
-        response, spoken = _handle_chat_streaming(question)
+        dbg.event("ROUTE", f"chat: user={user_input!r} "
+                           f"router_msg={(decision.get('message') if isinstance(decision, dict) else None)!r}")
+        response, was_streamed = _handle_chat_streaming(user_input)
         return AssistantResponse(
-            text=response, was_streamed=True, was_spoken=spoken,
+            text=response,
+            was_streamed=was_streamed,
         )
 
     t_tool = time.perf_counter()
@@ -586,10 +620,10 @@ def _handle_chat_streaming(question: str) -> tuple[str, bool]:
     t_mem = time.perf_counter()
     messages = conversation.get_messages(sid, current_user_input=question)
     try:
-        records = assemble_memory(question, sid)
-        dbg.memory(records)
+        from memory.retrieval import baseline_memory
+        dbg.memory(baseline_memory(sid))
     except Exception as e:
-        dbg.error(f"memory retrieval failed: {e}")
+        dbg.error(f"baseline load failed: {e}")
         dbg.memory([])
 
     # Memory tool path
@@ -635,10 +669,6 @@ def _handle_chat_streaming(question: str) -> tuple[str, bool]:
 
     try:
         for tok in gen:
-            if _poll_for_cancel() and not token.is_cancelled():
-                print("\n⏹️  Cancelled (Esc).")
-                token.cancel()
-
             if token.is_cancelled():
                 cancelled = True
                 break
@@ -682,38 +712,55 @@ def _handle_chat_streaming(question: str) -> tuple[str, bool]:
 
 def _try_memory_tool_path(messages: list, sid: int) -> str | None:
     from core.llm import chat_with_tools, append_tool_exchange
+    import json as _json
 
-    debug = getattr(settings, "TIMING", False)
+    backend = getattr(settings, "CHAT_BACKEND", "ollama")
+    model = (getattr(settings, "BONSAI_MODEL", None) if backend == "bonsai"
+             else settings.REASONING_MODEL)
+
+    dbg.event("7A", f"enter: backend={backend} model={model} "
+                    f"msgs={len(messages)}")
+
+    # First call: model decides whether to use the tool. Longer timeout
+    # because the model may emit a short preamble before the tool call.
+    first_call_messages = messages
+    if messages and messages[0].get("role") == "system":
+        sys_with_hint = {
+            "role": "system",
+            "content": messages[0]["content"] + "\n\n" + _TOOL_PATH_HINT,
+        }
+        first_call_messages = [sys_with_hint] + messages[1:]
+    else:
+        first_call_messages = (
+            [{"role": "system", "content": _TOOL_PATH_HINT}] + messages
+        )
 
     result = chat_with_tools(
-        messages,
+        first_call_messages,
         tools=[SEARCH_MEMORY_SCHEMA],
-        model=settings.REASONING_MODEL,
+        model=model,
+        timeout=(10, 45),
     )
 
     if result.get("raw", {}).get("error"):
-        print(f"⚠️ Tool-enabled chat failed: {result['raw']['error']}")
+        dbg.event("7A", f"first call failed: {result['raw']['error']}")
         return None
 
     tool_calls = result.get("tool_calls") or []
-    if debug:
-        print(f"   [7a] first call: {len(tool_calls)} tool_call(s), "
-              f"content={result.get('content','')[:60]!r}")
+    content = result.get("content", "")
+    dbg.event("7A", f"first call: tool_calls={len(tool_calls)} "
+                    f"content_len={len(content)}")
 
     if not tool_calls:
-        content = result.get("content", "").strip()
-        if debug and not content:
-            print("   [7a] model produced no tool call and no content")
-        return content or None
+        # Model answered directly. Use it.
+        return content.strip() or None
 
+    # Execute each tool call and append the exchange.
     messages_with_tool = messages
     for tc in tool_calls:
-        fn = tc.get("function") or {}
-        name = fn.get("name")
-        args = fn.get("arguments") or {}
-
-        if debug:
-            print(f"   [7a] tool call: {name}({args})")
+        name = tc.get("name")
+        args = tc.get("arguments") or {}
+        dbg.event("7A", f"call: {name}({args})")
 
         if name != "search_memory":
             tool_result = f"(unknown tool: {name})"
@@ -724,34 +771,39 @@ def _try_memory_tool_path(messages: list, sid: int) -> str | None:
             except Exception as e:
                 tool_result = f"(tool error: {e})"
 
-        if debug:
-            preview = tool_result[:80].replace("\n", " ")
-            print(f"   [7a] tool result: {preview}...")
+        preview = tool_result[:120].replace("\n", " ")
+        dbg.event("7A", f"result: {preview}")
 
         messages_with_tool = append_tool_exchange(
             messages_with_tool, tc, tool_result
         )
 
+    # Second call: model answers using the tool results.
+    #
+    # IMPORTANT: do NOT send `tools` here. The tool result is in the
+    # message stream; offering the tool again invites the model to call
+    # it a second time, which produces an empty `content` and hangs the
+    # assistant. Also bound the timeout tightly — a stuck follow-up
+    # blocks the CLI.
     follow_up = chat_with_tools(
         messages_with_tool,
-        tools=[SEARCH_MEMORY_SCHEMA],
-        model=settings.REASONING_MODEL,
+        tools=[],
+        model=model,
+        timeout=(10, 30),
     )
 
     if follow_up.get("raw", {}).get("error"):
-        print(f"⚠️ Tool follow-up failed: {follow_up['raw']['error']}")
+        dbg.event("7A", f"follow-up failed: {follow_up['raw']['error']}")
         return None
 
-    content = (follow_up.get("content") or "").strip()
-    if debug:
-        print(f"   [7a] second call: content={content[:80]!r}")
+    final = (follow_up.get("content") or "").strip()
+    dbg.event("7A", f"follow-up: content_len={len(final)}")
 
-    if not content:
+    if not final:
         return None
 
     messages[:] = messages_with_tool
-    return content
-
+    return final
 
 def _persist_turn(role: str, text: str, session_id=None, excluded: bool = False):
     """Write a turn. If excluded=True, mark it to skip future extraction."""
@@ -839,7 +891,7 @@ def main():
     print("-" * 60 + "\n")
     from memory.store import backfill_fact_embeddings
     backfill_fact_embeddings()
-
+    start_cancel_listener()
     while True:
         try:
             user_input = input("⌨️  You: ").strip()
@@ -872,6 +924,7 @@ def main():
             print(f"❌ Error: {e}")
 
     stop_worker()
+    stop_cancel_listener()
     from memory.sessions import close_session as _close, get_current_session_id
     sid = get_current_session_id()
     _close(sid)

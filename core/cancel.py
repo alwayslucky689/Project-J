@@ -7,7 +7,83 @@
 
 import threading
 from typing import Optional
+# ===== Esc / typed-word cancellation listener =====
+#
+# One background thread that owns stdin while a request is active and
+# leaves it alone when idle, so input() still works normally.
 
+import msvcrt
+import time
+
+_listener_thread = None
+_listener_stop = threading.Event()
+
+# Words that cancel an active request when typed and Enter is pressed.
+_CANCEL_WORDS = {"stop", "cancel", "abort", "halt"}
+
+
+def start_listener():
+    """Start the background cancel listener. Idempotent.
+
+    Behavior:
+      - Idle (no active token): does not read stdin at all, so input()
+        works normally.
+      - Active token: consumes keystrokes. Esc cancels immediately.
+        Typing one of the cancel words followed by Enter cancels.
+    """
+    global _listener_thread
+    if _listener_thread is not None and _listener_thread.is_alive():
+        return
+    _listener_stop.clear()
+
+    def _listen():
+        typed_buffer = ""
+        while not _listener_stop.is_set():
+            try:
+                tok = get_current()
+                active = tok is not None and not tok.is_cancelled()
+
+                # Idle: don't eat characters — let input() handle stdin.
+                if not active:
+                    typed_buffer = ""
+                    time.sleep(0.05)
+                    continue
+
+                if msvcrt.kbhit():
+                    ch = msvcrt.getwch()
+
+                    if ch == "\x1b":               # Esc
+                        print("\n⏹️  Cancelled (Esc).")
+                        tok.cancel()
+                        typed_buffer = ""
+
+                    elif ch in ("\r", "\n"):       # Enter — evaluate word
+                        word = typed_buffer.strip().lower()
+                        if word in _CANCEL_WORDS:
+                            print(f"\n⏹️  Cancelled ({word}).")
+                            tok.cancel()
+                        typed_buffer = ""
+
+                    elif ch in ("\b", "\x7f"):     # Backspace
+                        typed_buffer = typed_buffer[:-1]
+
+                    elif ch.isprintable():
+                        typed_buffer += ch
+                else:
+                    time.sleep(0.05)
+
+            except Exception:
+                time.sleep(0.2)
+
+    _listener_thread = threading.Thread(
+        target=_listen, daemon=True, name="cancel-listener"
+    )
+    _listener_thread.start()
+
+
+def stop_listener():
+    """Signal the listener thread to exit. Safe to call even if not running."""
+    _listener_stop.set()
 
 class CancelToken:
     def __init__(self):

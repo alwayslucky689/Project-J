@@ -107,7 +107,34 @@ def _get_spacy():
             _nlp_failed = True
     return _nlp
 
+_PROPERTY_ALIASES = {
+    "like": "prefers",
+    "likes": "prefers",
+    "loves": "prefers",
+    "love": "prefers",
+    "enjoys": "prefers",
+    "enjoy": "prefers",
+    "prefer": "prefers",
+    "favorite": "prefers",
+    "favourite": "prefers",
+    "hate": "dislikes",
+    "hates": "dislikes",
+    "dislike": "dislikes",
+    "dislikes": "dislikes",
+    "live_in": "lives_in",
+    "live_at": "lives_in",
+    "work_at": "works_at",
+    "work_for": "works_for",
+    "study": "studies",
+    "learn": "is_learning",
+    "learns": "is_learning",
+}
 
+
+def _canonical_property(prop: str) -> str:
+    if not prop:
+        return prop
+    return _PROPERTY_ALIASES.get(prop.lower(), prop.lower())
 
 
 
@@ -157,10 +184,18 @@ def extract_candidates(turns: list[dict]) -> list[dict]:
 # ===== Pre-filter =====
 
 _SIGNAL_WORDS = (
+    # First-person, both with and without apostrophes
     "i ", "i'm ", "i am ", "i've ", "i have ", "i'd ", "i'll ",
+    "im ", "ive ", "id ", "ill ",
     "my ", "we ", "we're ", "our ",
+    # Preference / ownership verbs
     "prefer", "like", "love", "hate", "dislike", "enjoy",
+    "fondness", "favorite", "favourite", "into ",
+    "interested in", "obsessed with",
+    # Life facts
     "work at", "work for", "live in", "live at", "study", "learning",
+    "grew up", "moved to", "born in",
+    # Explicit memory commands
     "remember", "note that",
 )
 
@@ -322,10 +357,9 @@ def _render_fact_text(subject, verb_lemma, value, prep) -> str:
 # ===== Stage 4: LLM fallback =====
 
 def _extract_llm(text: str) -> list[dict]:
-    """Structured extraction via the fast model. Only called for hard cases."""
+    """Structured extraction via the reasoning model. Only called for hard cases."""
     try:
-        from config import settings
-        from core.llm import ask_ollama
+        from core.llm import generate_text
     except ImportError:
         return []
 
@@ -339,10 +373,11 @@ Return a JSON array. Each fact must have exactly these fields:
   "epistemic_status": one of "assertion" | "plan" | "observation"
 
 Rules:
-- Only facts about the speaker or the speaker's relations.
+- Only facts explicitly stated by the speaker about themselves or their relations.
+- Do NOT infer, do NOT fill in from context, do NOT invent details.
 - Skip hypotheticals ("if I...", "I might..." with no commitment).
 - Skip questions.
-- Preserve uncertainty: "might move" → "plan" not "assertion".
+- Preserve uncertainty: "might move" -> "plan" not "assertion".
 - Return [] if nothing to extract.
 
 Text: {text}
@@ -350,11 +385,10 @@ Text: {text}
 JSON array:"""
 
     try:
-        result = ask_ollama(prompt, is_json=False, model=settings.FAST_MODEL)
+        result = generate_text(prompt, temperature=0.1)
     except Exception:
-        return []
+        return ""
 
-    # The model may return prose; extract the first JSON array
     import json
     m = re.search(r"\[.*\]", result, re.DOTALL)
     if not m:
@@ -381,7 +415,6 @@ JSON array:"""
             "scope_type": "unscoped",
         })
     return candidates
-
 
 # ===== Epistemic classification =====
 

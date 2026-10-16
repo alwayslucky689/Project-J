@@ -134,15 +134,17 @@ def merge_session_into_state(topic_id: int,
 
 def _call_merge_llm(prompt: str) -> Optional[dict]:
     try:
-        from config import settings
-        from core.llm import ask_ollama
+        from core.llm import generate_text
     except ImportError:
         return None
 
     try:
-        result = ask_ollama(prompt, is_json=False, model=settings.FAST_MODEL)
+        result = generate_text(prompt, temperature=0.2)
     except Exception as e:
         print(f"⚠️ Topic state merge LLM call failed: {e}")
+        return None
+
+    if not result:
         return None
 
     parsed = _extract_json_object(result)
@@ -153,7 +155,7 @@ def _call_merge_llm(prompt: str) -> Optional[dict]:
         "objective": str(parsed.get("objective") or "").strip(),
         "active_decisions": _coerce_str_list(parsed.get("active_decisions")),
         "open_questions": _coerce_str_list(parsed.get("open_questions")),
-        "updated_at": None,  # stamped by set_state
+        "updated_at": None,
     }
 
 

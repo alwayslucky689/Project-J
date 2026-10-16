@@ -1,24 +1,18 @@
 # core/debug_log.py - Async structured logger for the assistant
 #
-# Writes one log file per session. On startup, rotates the previous
-# session.log to session.prev.log. All writes go through a queue so
-# callers never block on I/O. GPU stats come from a background thread
-# (pynvml if available, subprocess fallback otherwise).
-#
-# Thread-safe. Callers use module-level functions — no need to pass
-# the logger around.
+# One log file per session: logs/session_<id>.log. No rotation — the
+# session id in the filename makes each file self-identifying, and an
+# aborted process can't leave an open handle that blocks the next run.
 
 import atexit
 import queue
-import shutil
 import threading
 import time
 from pathlib import Path
 from typing import Optional
 
 LOG_DIR = Path("logs")
-LOG_CURRENT = LOG_DIR / "session.log"
-LOG_PREVIOUS = LOG_DIR / "session.prev.log"
+LOG_CURRENT: Optional[Path] = None   # set at init()
 
 _lock = threading.Lock()
 _queue: "queue.Queue[str]" = queue.Queue()
@@ -42,7 +36,7 @@ def _ts() -> str:
 def init(session_id: Optional[int] = None, debug: bool = False,
          gpu_poll_seconds: float = 5.0):
     """Start the logger. Idempotent."""
-    global _session_id, _debug_console, _writer_thread, _gpu_thread
+    global _session_id, _debug_console, _writer_thread, _gpu_thread, LOG_CURRENT
     with _lock:
         if _writer_thread is not None:
             return
@@ -50,12 +44,10 @@ def init(session_id: Optional[int] = None, debug: bool = False,
         _debug_console = debug
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
-        # Rotate current → previous
-        if LOG_CURRENT.exists():
-            try:
-                shutil.move(str(LOG_CURRENT), str(LOG_PREVIOUS))
-            except Exception:
-                pass
+        if session_id is not None:
+            LOG_CURRENT = LOG_DIR / f"session_{session_id:03d}.log"
+        else:
+            LOG_CURRENT = LOG_DIR / f"session_{int(time.time())}.log"
 
         _stop.clear()
         _writer_thread = threading.Thread(
@@ -70,10 +62,11 @@ def init(session_id: Optional[int] = None, debug: bool = False,
         )
         _gpu_thread.start()
 
-        event("SESSION", f"{session_id or '?'} started")
+        event("SESSION", f"{session_id or '?'} started → {LOG_CURRENT.name}")
 
 
 _shutdown_done = threading.Event()
+
 
 def shutdown():
     if _shutdown_done.is_set():
@@ -86,11 +79,10 @@ def shutdown():
         _writer_thread.join(timeout=2.0)
         _writer_thread = None
     _gpu_thread = None
-    try:
-        with open(LOG_CURRENT, "a", encoding="utf-8") as f:
-            f.write(f"[{_ts()}] SESSION ended\n")
-    except Exception:
-        pass
+
+
+def is_debug_enabled() -> bool:
+    return _debug_console
 
 
 def event(category: str, message: str):
@@ -181,16 +173,29 @@ def error(msg: str):
 # ===== Writer thread =====
 
 def _writer_loop():
+    if LOG_CURRENT is None:
+        return
     with open(LOG_CURRENT, "a", encoding="utf-8", buffering=1) as f:
-        while not _stop.is_set() or not _queue.empty():
+        f.write(f"[{_ts()}] SESSION started\n")
+        while True:
             try:
                 line = _queue.get(timeout=0.3)
-            except queue.Empty:
-                continue
-            try:
                 f.write(line + "\n")
-            except Exception:
-                pass
+            except queue.Empty:
+                if _stop.is_set():
+                    # Drain whatever the worker enqueued between our
+                    # last read and the stop signal.
+                    while True:
+                        try:
+                            line = _queue.get_nowait()
+                            f.write(line + "\n")
+                        except queue.Empty:
+                            break
+                    break
+        try:
+            f.write(f"[{_ts()}] SESSION ended\n")
+        except Exception:
+            pass
 
 
 # ===== GPU polling =====

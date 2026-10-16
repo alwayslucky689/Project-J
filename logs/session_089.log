@@ -1,0 +1,202 @@
+[14:39:19.496] SESSION started
+[14:39:19.496] SESSION: 89 started → session_089.log
+[14:39:19.515] GPU monitor: pynvml
+[14:39:23.903] ────: ────────────────────────────────────────────────────────────
+[14:39:23.903] USER: what food do i like
+[14:39:24.415] ROUTE: → chat (511ms, conf=1.00)
+[14:39:24.415] ROUTE: chat: user='what food do i like' router_msg='what food do i like'
+[14:39:24.418] MEMORY: 0 records
+[14:39:24.418] 7A: enter: backend=bonsai model=bonsai msgs=2
+[14:39:24.522] GPU: vram=7691/8192MB util=0%
+[14:39:26.883] 7A: first call: tool_calls=1 content_len=0
+[14:39:26.883] 7A: call: search_memory({'query': 'food I like preferences taste'})
+[14:39:27.628] 7A: result: <retrieved_memory trust="data" source="prior_sessions">  [global facts] - [2026-10-15] i like pizza - [2026-10-15] The u
+[14:39:28.825] 7A: follow-up: content_len=51
+[14:39:28.825] ASSISTANT: You have a well-documented affinity for pizza, sir.
+[14:39:28.825] TURN TOTAL: 4408ms
+[14:39:29.522] GPU: vram=7690/8192MB util=63%
+[14:39:34.524] GPU: vram=7684/8192MB util=0%
+[14:39:35.227] ────: ────────────────────────────────────────────────────────────
+[14:39:35.227] USER: do you remember which mode i prefer
+[14:39:35.412] ROUTE: → chat (186ms, conf=1.00)
+[14:39:35.412] ROUTE: chat: user='do you remember which mode i prefer' router_msg='do you remember which mode i prefer'
+[14:39:35.413] MEMORY: 0 records
+[14:39:35.413] 7A: enter: backend=bonsai model=bonsai msgs=4
+[14:39:36.896] 7A: first call: tool_calls=1 content_len=0
+[14:39:36.896] 7A: call: search_memory({'query': 'which mode user prefers'})
+[14:39:36.907] 7A: result: <retrieved_memory trust="data" source="prior_sessions">  [global facts] - [2026-10-15] The user prefers which one. - [20
+[14:39:38.101] 7A: follow-up: content_len=15
+[14:39:38.102] ASSISTANT: Dark mode, sir.
+[14:39:38.102] TURN TOTAL: 2689ms
+[14:39:39.533] GPU: vram=7684/8192MB util=0%
+[14:39:44.544] GPU: vram=7708/8192MB util=0%
+[14:39:49.551] GPU: vram=7708/8192MB util=0%
+[14:39:54.552] GPU: vram=7706/8192MB util=0%
+[14:39:59.556] GPU: vram=7707/8192MB util=0%
+[14:40:04.559] GPU: vram=7707/8192MB util=0%
+[14:40:09.560] GPU: vram=7701/8192MB util=0%
+[14:40:14.575] GPU: vram=7692/8192MB util=0%
+[14:40:19.577] GPU: vram=7707/8192MB util=0%
+[14:40:24.578] GPU: vram=7707/8192MB util=0%
+[14:40:29.585] GPU: vram=7707/8192MB util=0%
+[14:40:34.589] GPU: vram=7703/8192MB util=3%
+[14:40:39.594] GPU: vram=7708/8192MB util=1%
+[14:40:44.598] GPU: vram=7708/8192MB util=3%
+[14:40:49.600] GPU: vram=7708/8192MB util=1%
+[14:40:54.605] GPU: vram=7708/8192MB util=1%
+[14:40:59.608] GPU: vram=7707/8192MB util=1%
+[14:41:04.611] GPU: vram=7708/8192MB util=0%
+[14:41:09.617] GPU: vram=7708/8192MB util=0%
+[14:41:14.632] GPU: vram=7708/8192MB util=0%
+[14:41:19.635] GPU: vram=7708/8192MB util=0%
+[14:41:24.636] GPU: vram=7708/8192MB util=0%
+[14:41:29.650] GPU: vram=7708/8192MB util=0%
+[14:41:34.665] GPU: vram=7708/8192MB util=0%
+[14:41:39.666] GPU: vram=7708/8192MB util=0%
+[14:41:44.670] GPU: vram=7708/8192MB util=0%
+[14:41:49.672] GPU: vram=7708/8192MB util=0%
+[14:41:54.675] GPU: vram=7708/8192MB util=0%
+[14:41:59.677] GPU: vram=7708/8192MB util=0%
+[14:42:04.688] GPU: vram=7708/8192MB util=0%
+[14:42:09.700] GPU: vram=7709/8192MB util=0%
+[14:42:14.701] GPU: vram=7709/8192MB util=0%
+[14:42:19.704] GPU: vram=7709/8192MB util=0%
+[14:42:24.706] GPU: vram=7709/8192MB util=0%
+[14:42:29.706] GPU: vram=7713/8192MB util=0%
+[14:42:34.710] GPU: vram=7711/8192MB util=0%
+[14:42:39.719] GPU: vram=7711/8192MB util=0%
+[14:42:44.730] GPU: vram=7711/8192MB util=0%
+[14:42:49.745] GPU: vram=7711/8192MB util=0%
+[14:42:54.749] GPU: vram=7711/8192MB util=0%
+[14:42:59.754] GPU: vram=7711/8192MB util=0%
+[14:43:04.754] GPU: vram=7711/8192MB util=0%
+[14:43:09.759] GPU: vram=7708/8192MB util=0%
+[14:43:14.760] GPU: vram=7708/8192MB util=0%
+[14:43:19.767] GPU: vram=7708/8192MB util=0%
+[14:43:24.768] GPU: vram=7710/8192MB util=0%
+[14:43:29.772] GPU: vram=7710/8192MB util=3%
+[14:43:34.777] GPU: vram=7710/8192MB util=2%
+[14:43:39.792] GPU: vram=7710/8192MB util=3%
+[14:43:44.798] GPU: vram=7710/8192MB util=3%
+[14:43:49.807] GPU: vram=7710/8192MB util=1%
+[14:43:54.811] GPU: vram=7710/8192MB util=0%
+[14:43:59.811] GPU: vram=7710/8192MB util=0%
+[14:44:04.826] GPU: vram=7710/8192MB util=0%
+[14:44:09.842] GPU: vram=7710/8192MB util=0%
+[14:44:14.856] GPU: vram=7710/8192MB util=0%
+[14:44:19.856] GPU: vram=7710/8192MB util=0%
+[14:44:24.861] GPU: vram=7710/8192MB util=0%
+[14:44:29.865] GPU: vram=7710/8192MB util=0%
+[14:44:34.867] GPU: vram=7710/8192MB util=0%
+[14:44:39.868] GPU: vram=7710/8192MB util=0%
+[14:44:44.872] GPU: vram=7710/8192MB util=0%
+[14:44:49.886] GPU: vram=7710/8192MB util=0%
+[14:44:54.895] GPU: vram=7710/8192MB util=0%
+[14:44:59.906] GPU: vram=7710/8192MB util=0%
+[14:45:04.920] GPU: vram=7710/8192MB util=0%
+[14:45:09.935] GPU: vram=7710/8192MB util=0%
+[14:45:14.949] GPU: vram=7850/8192MB util=1%
+[14:45:19.965] GPU: vram=7845/8192MB util=1%
+[14:45:24.980] GPU: vram=7848/8192MB util=0%
+[14:45:29.992] GPU: vram=7782/8192MB util=4%
+[14:45:34.997] GPU: vram=7688/8192MB util=1%
+[14:45:40.010] GPU: vram=7683/8192MB util=0%
+[14:45:45.016] GPU: vram=7703/8192MB util=1%
+[14:45:50.023] GPU: vram=7708/8192MB util=3%
+[14:45:55.036] GPU: vram=7713/8192MB util=3%
+[14:46:00.045] GPU: vram=7708/8192MB util=2%
+[14:46:05.054] GPU: vram=7776/8192MB util=0%
+[14:46:10.060] GPU: vram=7778/8192MB util=1%
+[14:46:15.070] GPU: vram=7778/8192MB util=2%
+[14:46:20.078] GPU: vram=7678/8192MB util=0%
+[14:46:25.088] GPU: vram=7685/8192MB util=2%
+[14:46:30.096] GPU: vram=7686/8192MB util=1%
+[14:46:35.103] GPU: vram=7690/8192MB util=1%
+[14:46:40.108] GPU: vram=7700/8192MB util=0%
+[14:46:45.108] GPU: vram=7689/8192MB util=0%
+[14:46:50.119] GPU: vram=7759/8192MB util=1%
+[14:46:55.129] GPU: vram=7755/8192MB util=2%
+[14:47:00.133] GPU: vram=7755/8192MB util=0%
+[14:47:05.134] GPU: vram=7755/8192MB util=0%
+[14:47:10.148] GPU: vram=7739/8192MB util=0%
+[14:47:15.163] GPU: vram=7739/8192MB util=0%
+[14:47:20.169] GPU: vram=7692/8192MB util=0%
+[14:47:25.171] GPU: vram=7697/8192MB util=0%
+[14:47:30.176] GPU: vram=7696/8192MB util=0%
+[14:47:35.181] GPU: vram=7696/8192MB util=0%
+[14:47:40.187] GPU: vram=7696/8192MB util=0%
+[14:47:45.188] GPU: vram=7696/8192MB util=0%
+[14:47:50.190] GPU: vram=7696/8192MB util=0%
+[14:47:55.206] GPU: vram=7696/8192MB util=0%
+[14:48:00.206] GPU: vram=7696/8192MB util=0%
+[14:48:05.219] GPU: vram=7696/8192MB util=0%
+[14:48:10.231] GPU: vram=7696/8192MB util=0%
+[14:48:15.246] GPU: vram=7696/8192MB util=0%
+[14:48:20.260] GPU: vram=7694/8192MB util=0%
+[14:48:25.275] GPU: vram=7694/8192MB util=0%
+[14:48:30.279] GPU: vram=7694/8192MB util=0%
+[14:48:35.280] GPU: vram=7694/8192MB util=0%
+[14:48:40.283] GPU: vram=7694/8192MB util=0%
+[14:48:45.297] GPU: vram=7694/8192MB util=0%
+[14:48:50.311] GPU: vram=7694/8192MB util=0%
+[14:48:55.325] GPU: vram=7694/8192MB util=0%
+[14:49:00.330] GPU: vram=7694/8192MB util=0%
+[14:49:05.345] GPU: vram=7694/8192MB util=0%
+[14:49:10.346] GPU: vram=7694/8192MB util=0%
+[14:49:15.348] GPU: vram=7694/8192MB util=0%
+[14:49:20.363] GPU: vram=7694/8192MB util=0%
+[14:49:25.366] GPU: vram=7694/8192MB util=0%
+[14:49:30.382] GPU: vram=7694/8192MB util=0%
+[14:49:35.385] GPU: vram=7694/8192MB util=0%
+[14:49:40.398] GPU: vram=7694/8192MB util=0%
+[14:49:45.414] GPU: vram=7694/8192MB util=0%
+[14:49:50.416] GPU: vram=7694/8192MB util=0%
+[14:49:55.417] GPU: vram=7694/8192MB util=0%
+[14:50:00.432] GPU: vram=7694/8192MB util=0%
+[14:50:05.434] GPU: vram=7694/8192MB util=0%
+[14:50:10.449] GPU: vram=7694/8192MB util=0%
+[14:50:15.450] GPU: vram=7694/8192MB util=0%
+[14:50:20.451] GPU: vram=7694/8192MB util=0%
+[14:50:25.453] GPU: vram=7694/8192MB util=0%
+[14:50:30.468] GPU: vram=7694/8192MB util=0%
+[14:50:35.483] GPU: vram=7694/8192MB util=0%
+[14:50:40.494] GPU: vram=7694/8192MB util=0%
+[14:50:45.497] GPU: vram=7694/8192MB util=0%
+[14:50:50.512] GPU: vram=7694/8192MB util=0%
+[14:50:55.513] GPU: vram=7694/8192MB util=0%
+[14:51:00.514] GPU: vram=7694/8192MB util=0%
+[14:51:05.529] GPU: vram=7694/8192MB util=0%
+[14:51:10.544] GPU: vram=7694/8192MB util=0%
+[14:51:15.558] GPU: vram=7694/8192MB util=0%
+[14:51:20.574] GPU: vram=7694/8192MB util=0%
+[14:51:25.583] GPU: vram=7694/8192MB util=0%
+[14:51:30.589] GPU: vram=7694/8192MB util=0%
+[14:51:35.591] GPU: vram=7694/8192MB util=0%
+[14:51:40.605] GPU: vram=7694/8192MB util=0%
+[14:51:45.615] GPU: vram=7694/8192MB util=0%
+[14:51:50.619] GPU: vram=7694/8192MB util=0%
+[14:51:55.632] GPU: vram=7694/8192MB util=0%
+[14:52:00.646] GPU: vram=7694/8192MB util=0%
+[14:52:05.648] GPU: vram=7694/8192MB util=0%
+[14:52:10.654] GPU: vram=7694/8192MB util=0%
+[14:52:15.656] GPU: vram=7694/8192MB util=0%
+[14:52:20.660] GPU: vram=7694/8192MB util=0%
+[14:52:25.662] GPU: vram=7694/8192MB util=0%
+[14:52:30.665] GPU: vram=7694/8192MB util=0%
+[14:52:35.678] GPU: vram=7694/8192MB util=0%
+[14:52:40.682] GPU: vram=7694/8192MB util=0%
+[14:52:45.698] GPU: vram=7694/8192MB util=0%
+[14:52:50.709] GPU: vram=7694/8192MB util=0%
+[14:52:55.720] GPU: vram=7694/8192MB util=0%
+[14:53:00.724] GPU: vram=7694/8192MB util=0%
+[14:53:05.726] GPU: vram=7694/8192MB util=0%
+[14:53:10.733] GPU: vram=7694/8192MB util=0%
+[14:53:15.735] GPU: vram=7694/8192MB util=0%
+[14:53:20.750] GPU: vram=7694/8192MB util=0%
+[14:53:25.752] GPU: vram=7694/8192MB util=0%
+[14:53:30.766] GPU: vram=7808/8192MB util=1%
+[14:53:35.779] GPU: vram=7775/8192MB util=5%
+[14:53:40.794] GPU: vram=7738/8192MB util=3%
+[14:53:45.800] GPU: vram=7721/8192MB util=0%
+[14:53:50.808] GPU: vram=7733/8192MB util=3%
+[14:53:51.736] SESSION ended

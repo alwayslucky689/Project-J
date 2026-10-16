@@ -40,22 +40,38 @@ def validate_candidate(candidate: dict) -> tuple[bool, dict | None, str]:
     if subject not in ("user",) and not subject.startswith("user's "):
         return False, None, f"third-party subject: {subject}"
 
-    # 3. Value presence
+    # 3. Value presence — MUST come before any use of `value`.
     value = candidate.get("value", "").strip()
     if not value or len(value) < 2:
         return False, None, "empty or trivial value"
 
-    # 4. Detection of correction markers on the source text
+    # 4. Value specificity — reject category-level and stopword values.
+    if value.lower() in (
+        "food", "thing", "stuff", "everything", "anything",
+        "something", "nothing", "remember", "it", "that", "this",
+    ):
+        return False, None, f"value too generic: {value!r}"
+
+    # 5. Question-shaped source text (has no '?' but starts like a question).
     src = candidate.get("source_text", candidate.get("text", ""))
+    src_lower = src.lower().strip()
+    question_starters = (
+        "which ", "what ", "who ", "where ", "when ", "why ", "how ",
+        "should i ", "should we ", "do i ", "do we ", "can i ",
+    )
+    if src_lower.startswith(question_starters):
+        return False, None, "question-shaped"
+
+    # 6. Detection of correction markers on the source text
     is_correction = any(m in src.lower() for m in _CORRECTION_MARKERS)
 
-    # 5. Simple negation on the verb → reject (too fragile to interpret)
+    # 7. Simple negation on the verb → reject (too fragile to interpret)
     if _SIMPLE_NEGATION.search(src) and not is_correction:
         return False, None, "simple negation"
 
     # Attach the correction flag for resolve.py
     revised = dict(candidate)
     revised["is_correction"] = is_correction
-    revised["status"] = "active"  # inferred but confirmed enough
+    revised["status"] = "active"
 
     return True, revised, ""

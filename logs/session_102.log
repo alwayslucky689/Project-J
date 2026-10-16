@@ -1,0 +1,40 @@
+[16:10:09.410] SESSION started
+[16:10:09.409] WORKER: loop entered
+[16:10:09.409] WORKER: should_run=True
+[16:10:09.409] WORKER: >>> RUN_BATCH ENTERED <<<
+[16:10:09.410] WORKER: >>> got 6 turns <<<
+[16:10:09.410] WORKER: batch: 6 pending turns
+[16:10:09.410] SESSION: 102 started → session_102.log
+[16:10:09.436] GPU monitor: pynvml
+[16:10:10.909] WORKER: extract: 3 candidates
+[16:10:10.911] WORKER: loop error: cannot access local variable 'value' where it is not associated with a value
+[16:10:14.437] GPU: vram=7710/8192MB util=26%
+[16:10:19.443] GPU: vram=7710/8192MB util=0%
+[16:10:24.444] GPU: vram=7710/8192MB util=0%
+[16:10:29.460] GPU: vram=7710/8192MB util=0%
+[16:10:34.467] GPU: vram=7710/8192MB util=0%
+[16:10:39.468] GPU: vram=7710/8192MB util=0%
+[16:10:40.913] WORKER: should_run=True
+[16:10:40.913] WORKER: >>> RUN_BATCH ENTERED <<<
+[16:10:40.913] WORKER: >>> got 6 turns <<<
+[16:10:40.913] WORKER: batch: 6 pending turns
+[16:10:40.922] WORKER: extract: 3 candidates
+[16:10:40.922] WORKER: loop error: cannot access local variable 'value' where it is not associated with a value
+[16:10:44.481] GPU: vram=7710/8192MB util=0%
+[16:10:49.490] GPU: vram=7710/8192MB util=0%
+[16:10:54.497] GPU: vram=7710/8192MB util=0%
+[16:10:59.499] GPU: vram=7710/8192MB util=0%
+[16:11:04.503] GPU: vram=7710/8192MB util=0%
+[16:11:09.515] GPU: vram=7710/8192MB util=0%
+[16:11:10.930] WORKER: should_run=True
+[16:11:10.930] WORKER: >>> RUN_BATCH ENTERED <<<
+[16:11:10.930] WORKER: >>> got 6 turns <<<
+[16:11:10.930] WORKER: batch: 6 pending turns
+[16:11:10.939] WORKER: extract: 3 candidates
+[16:11:10.940] WORKER: loop error: cannot access local variable 'value' where it is not associated with a value
+[16:11:14.515] GPU: vram=7710/8192MB util=0%
+[16:11:19.528] GPU: vram=7710/8192MB util=0%
+[16:11:24.541] GPU: vram=7710/8192MB util=0%
+[16:11:29.543] GPU: vram=7710/8192MB util=0%
+[16:11:32.948] WORKER: stop requested; finishing current batch
+[16:11:33.578] SESSION ended

@@ -1,0 +1,42 @@
+[16:02:10.939] SESSION started
+[16:02:10.939] WORKER: loop entered
+[16:02:10.940] SESSION: 100 started → session_100.log
+[16:02:10.961] GPU monitor: pynvml
+[16:02:15.963] GPU: vram=7747/8192MB util=0%
+[16:02:20.043] ────: ────────────────────────────────────────────────────────────
+[16:02:20.043] USER: i like logitech mice
+[16:02:20.576] ROUTE: → chat (532ms, conf=1.00)
+[16:02:20.576] ROUTE: chat: user='i like logitech mice' router_msg='i like logitech mice'
+[16:02:20.579] MEMORY: 0 records
+[16:02:20.579] LLM: start: backend=bonsai model=bonsai
+[16:02:20.895] LLM: first token at 316ms
+[16:02:20.969] GPU: vram=7715/8192MB util=0%
+[16:02:21.564] LLM: 26 tokens in 985ms (26.40 tok/s)
+[16:02:21.564] ASSISTANT: Noted, sir. I'll ensure the Logitech drivers are up to date and that your peripheral inventory is properly catalogued.
+[16:02:21.564] TURN TOTAL: 986ms
+[16:02:25.975] GPU: vram=7715/8192MB util=0%
+[16:02:26.881] ────: ────────────────────────────────────────────────────────────
+[16:02:26.881] USER: i prefer computers to consoles
+[16:02:27.018] ROUTE: → chat (136ms, conf=1.00)
+[16:02:27.018] ROUTE: chat: user='i prefer computers to consoles' router_msg='i prefer computers to consoles'
+[16:02:27.018] MEMORY: 0 records
+[16:02:27.018] LLM: start: backend=bonsai model=bonsai
+[16:02:27.333] LLM: first token at 315ms
+[16:02:28.251] LLM: 38 tokens in 1233ms (30.82 tok/s)
+[16:02:28.251] ASSISTANT: Understood. A more refined choice, I think, with its superior modularity and lack of proprietary restrictions. I'll ensure your PC specs remain current for whatever you choose to install next.
+[16:02:28.251] TURN TOTAL: 1233ms
+[16:02:30.982] GPU: vram=7715/8192MB util=0%
+[16:02:33.036] ────: ────────────────────────────────────────────────────────────
+[16:02:33.036] USER: i love hollow knight
+[16:02:33.311] ROUTE: → chat (275ms, conf=0.73, candidates=['chat'])
+[16:02:33.311] ROUTE: chat: user='i love hollow knight' router_msg='Hollow knight'
+[16:02:33.311] MEMORY: 0 records
+[16:02:33.311] LLM: start: backend=bonsai model=bonsai
+[16:02:33.622] LLM: first token at 310ms
+[16:02:33.967] LLM: 14 tokens in 656ms (21.35 tok/s)
+[16:02:33.968] ASSISTANT: A fine preference, sir. A game of considerable skill and atmosphere.
+[16:02:33.968] TURN TOTAL: 656ms
+[16:02:35.985] GPU: vram=7727/8192MB util=0%
+[16:02:39.055] WORKER: idle: checkpoint=541 pending=0
+[16:02:40.987] WORKER: stop requested; finishing current batch
+[16:02:41.305] SESSION ended

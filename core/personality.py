@@ -16,7 +16,7 @@ from config.paths import PERSONALITIES_DIR
 
 
 class PersonalityManager:
-    def __init__(self, default_name: str = "computah"):
+    def __init__(self, default_name: str = "jarvis"):
         self.personalities: dict[str, dict] = {}
         self.current: str = default_name
         self._load_all()

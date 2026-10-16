@@ -57,8 +57,7 @@ def _build_transcript(turns) -> str:
 
 def _generate_summary(transcript: str) -> Optional[str]:
     try:
-        from config import settings
-        from core.llm import ask_ollama
+        from core.llm import generate_text
     except ImportError:
         return None
 
@@ -76,36 +75,12 @@ Conversation:
 Summary:"""
 
     try:
-        result = ask_ollama(prompt, is_json=False, model=settings.FAST_MODEL)
+        result = generate_text(prompt, temperature=0.3)
     except Exception as e:
-        print(f"⚠️ Summary generation failed for transcript: {e}")
+        print(f"⚠️ Summary generation failed: {e}")
         return None
 
-    summary = result.strip().strip('"').strip("'")
+    summary = (result or "").strip().strip('"').strip("'")
     if not summary or len(summary) < 15 or len(summary) > 600:
         return None
     return summary
-
-
-def _write_summary(session_id: int, summary: str):
-    with write_transaction() as conn:
-        conn.execute(
-            "UPDATE sessions SET summary = ? WHERE id = ?",
-        (summary, session_id),
-        )
-
-    # Embed outside the write lock — model call is ~12ms
-    try:
-        from memory.embed import embed
-        vec = embed(summary)
-        if vec is None:
-            return
-        conn = get_conn()
-        conn.execute(
-            "INSERT OR REPLACE INTO session_embeddings "
-            "(session_id, embedding) VALUES (?, ?)",
-            (session_id, _vec_to_blob(vec)),
-        )
-        conn.commit()
-    except Exception as e:
-        print(f"⚠️ Could not embed session {session_id}: {e}")

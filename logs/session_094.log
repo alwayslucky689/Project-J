@@ -1,0 +1,12 @@
+[15:27:55.684] SESSION started
+[15:27:55.684] SESSION: 94 started → session_094.log
+[15:27:55.708] GPU monitor: pynvml
+[15:28:00.712] GPU: vram=7757/8192MB util=0%
+[15:28:05.727] GPU: vram=7757/8192MB util=0%
+[15:28:10.728] GPU: vram=7757/8192MB util=0%
+[15:28:15.738] GPU: vram=7766/8192MB util=3%
+[15:28:20.745] GPU: vram=7766/8192MB util=0%
+[15:28:25.754] GPU: vram=7765/8192MB util=2%
+[15:28:30.765] GPU: vram=7763/8192MB util=1%
+[15:28:34.651] WORKER: stop requested; finishing current batch
+[15:28:34.963] SESSION ended

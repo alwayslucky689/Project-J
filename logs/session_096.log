@@ -1,0 +1,16 @@
+[15:42:31.191] SESSION started
+[15:42:31.192] SESSION: 96 started → session_096.log
+[15:42:31.211] GPU monitor: pynvml
+[15:42:35.744] ────: ────────────────────────────────────────────────────────────
+[15:42:35.744] USER: i prefer beef to chicken
+[15:42:36.208] ROUTE: → chat (463ms, conf=1.00)
+[15:42:36.208] ROUTE: chat: user='i prefer beef to chicken' router_msg='i prefer beef to chicken'
+[15:42:36.211] MEMORY: 0 records
+[15:42:36.211] LLM: start: backend=bonsai model=bonsai
+[15:42:36.214] GPU: vram=7741/8192MB util=0%
+[15:42:36.512] LLM: first token at 301ms
+[15:42:36.821] LLM: 12 tokens in 610ms (19.67 tok/s)
+[15:42:36.821] ASSISTANT: Noted, sir. I shall adjust the menu accordingly.
+[15:42:36.821] TURN TOTAL: 612ms
+[15:42:38.209] WORKER: stop requested; finishing current batch
+[15:42:38.518] SESSION ended

@@ -1,0 +1,31 @@
+[15:20:05.161] SESSION started
+[15:20:05.161] SESSION: 92 started → session_092.log
+[15:20:05.186] GPU monitor: pynvml
+[15:20:08.941] ────: ────────────────────────────────────────────────────────────
+[15:20:08.941] USER: what kind of food do i like
+[15:20:09.422] ROUTE: → chat (480ms, conf=1.00)
+[15:20:09.422] ROUTE: chat: user='what kind of food do i like' router_msg='what kind of food do i like'
+[15:20:09.424] MEMORY: 0 records
+[15:20:09.424] 7A: enter: backend=bonsai model=bonsai msgs=2
+[15:20:10.190] GPU: vram=7850/8192MB util=0%
+[15:20:11.772] 7A: first call: tool_calls=1 content_len=0
+[15:20:11.772] 7A: call: search_memory({'query': 'what kind of food do i like'})
+[15:20:12.634] 7A: result: <retrieved_memory trust="data" source="prior_sessions">  [global facts] - [2026-10-15] i like pizza - [2026-10-15] i lik
+[15:20:14.033] 7A: follow-up: content_len=92
+[15:20:14.033] ASSISTANT: I recall a fondness for pizza and noodles, sir, along with a preference for vegetarian fare.
+[15:20:14.033] TURN TOTAL: 4610ms
+[15:20:15.205] GPU: vram=7841/8192MB util=51%
+[15:20:20.213] GPU: vram=7752/8192MB util=4%
+[15:20:25.216] GPU: vram=7751/8192MB util=0%
+[15:20:27.969] ────: ────────────────────────────────────────────────────────────
+[15:20:27.969] USER: i like lasagna too
+[15:20:28.276] ROUTE: → chat (308ms, conf=0.99, candidates=['chat'])
+[15:20:28.277] ROUTE: chat: user='i like lasagna too' router_msg='Lasagna too'
+[15:20:28.277] MEMORY: 0 records
+[15:20:28.277] LLM: start: backend=bonsai model=bonsai
+[15:20:28.745] LLM: first token at 468ms
+[15:20:29.123] LLM: 15 tokens in 846ms (17.73 tok/s)
+[15:20:29.123] ASSISTANT: Noted, sir. I shall add lasagna to the household menu.
+[15:20:29.123] TURN TOTAL: 847ms
+[15:20:30.221] GPU: vram=7729/8192MB util=54%
+[15:20:30.853] SESSION ended

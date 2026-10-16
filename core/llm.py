@@ -236,6 +236,68 @@ def stream_tokens(prompt_text: str, model: Optional[str] = None) -> Generator[st
                 yield token
     finally:
         response.close()
+# ===== Backend-agnostic single-shot text generation =====
+#
+# The chat path already dispatches on CHAT_BACKEND. This is the same
+# pattern for one-shot generation used by the memory pipeline
+# (extraction, summarization, topic-state merge). Without it, every
+# call silently targets Ollama and fails when the user is on Bonsai.
+
+def generate_text(prompt: str,
+                  model: Optional[str] = None,
+                  temperature: float = 0.3,
+                  timeout=(10, 60)) -> str:
+    """
+    Single-shot text generation. Returns the response text, or an empty
+    string on any failure — callers treat empty as "no result".
+    """
+    backend = getattr(settings, "CHAT_BACKEND", "ollama")
+    if backend == "bonsai":
+        return _generate_text_openai(prompt, model, temperature, timeout)
+    return _generate_text_ollama(prompt, model, temperature, timeout)
+
+
+def _generate_text_ollama(prompt, model, temperature, timeout) -> str:
+    model = model or settings.FAST_MODEL
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "temperature": temperature,
+    }
+    try:
+        response = _post(payload, timeout=timeout)
+    except OllamaError as e:
+        print(f"⚠️ generate_text (ollama) failed: {e}")
+        return ""
+    try:
+        return (response.json().get("response") or "").strip()
+    except Exception:
+        return ""
+
+
+def _generate_text_openai(prompt, model, temperature, timeout) -> str:
+    model = (model or getattr(settings, "BONSAI_MODEL", None)
+             or settings.REASONING_MODEL)
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+        "temperature": temperature,
+    }
+    try:
+        response = _post_openai_chat(payload, timeout=timeout)
+    except OllamaError as e:
+        print(f"⚠️ generate_text (bonsai) failed: {e}")
+        return ""
+    try:
+        data = response.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return ""
+        return (choices[0].get("message", {}).get("content") or "").strip()
+    except Exception:
+        return ""
 # ===== Chat endpoint (multi-turn conversation) =====
 
 def _post_chat(payload: dict, timeout, stream: bool = False) -> requests.Response:
@@ -343,20 +405,36 @@ def chat_stream_tokens(messages, model=None):
 
 # ===== Native tool calling (Phase 7a) =====
 
+# ===== Native tool calling (Phase 7a) =====
+
+def _chat_backend() -> str:
+    return getattr(settings, "CHAT_BACKEND", "ollama")
+
+
 def chat_with_tools(messages: list[dict],
                     tools: list[dict],
                     model: Optional[str] = None,
                     timeout=(10, 120)) -> dict:
     """
-    Non-streaming chat with native tool support.
+    Non-streaming chat with native tool support. Dispatches to Ollama
+    (/api/chat) or Bonsai (OpenAI-compatible /v1/chat/completions).
 
     Returns:
-        {"content": str, "tool_calls": list, "raw": dict}
+        {"content": str, "tool_calls": list[dict], "raw": dict}
 
-    tool_calls is [] if the model chose not to call anything.
-    content is "" if the model chose to call a tool (Ollama clears content
-    when tool_calls are present — see ollama/ollama#8337).
+    Each tool_call is normalized to:
+        {"id": str | None, "name": str, "arguments": dict, "_raw": dict}
+
+    The `_raw` field is the backend-native dict; append_tool_exchange
+    uses it to echo the call back in the shape the backend expects.
     """
+    backend = _chat_backend()
+    if backend == "bonsai":
+        return _chat_with_tools_openai(messages, tools, model, timeout)
+    return _chat_with_tools_ollama(messages, tools, model, timeout)
+
+
+def _chat_with_tools_ollama(messages, tools, model, timeout) -> dict:
     model = model or settings.REASONING_MODEL
     payload = {
         "model": model,
@@ -377,29 +455,128 @@ def chat_with_tools(messages: list[dict],
                 "raw": {"error": f"invalid json: {e}"}}
 
     msg = data.get("message") or {}
+    raw_calls = msg.get("tool_calls") or []
+
+    normalized = []
+    for tc in raw_calls:
+        fn = tc.get("function") or {}
+        args = fn.get("arguments")
+        if not isinstance(args, dict):
+            args = _parse_args(args)
+        normalized.append({
+            "id": None,
+            "name": fn.get("name", ""),
+            "arguments": args,
+            "_raw": tc,
+        })
+
     return {
         "content": (msg.get("content") or "").strip(),
-        "tool_calls": msg.get("tool_calls") or [],
+        "tool_calls": normalized,
         "raw": data,
     }
+
+
+def _chat_with_tools_openai(messages, tools, model, timeout) -> dict:
+    """OpenAI-compatible path — used by Bonsai (llama-server)."""
+    model = model or getattr(settings, "BONSAI_MODEL", None) \
+        or settings.REASONING_MODEL
+    payload = {
+        "model": model,
+        "messages": messages,
+        "tools": tools,
+        "stream": False,
+    }
+
+    try:
+        response = _post_openai_chat(payload, timeout=timeout)
+    except OllamaError as e:
+        return {"content": "", "tool_calls": [], "raw": {"error": str(e)}}
+
+    try:
+        data = response.json()
+    except Exception as e:
+        return {"content": "", "tool_calls": [],
+                "raw": {"error": f"invalid json: {e}"}}
+
+    choices = data.get("choices") or []
+    if not choices:
+        return {"content": "", "tool_calls": [], "raw": data}
+
+    msg = choices[0].get("message") or {}
+    raw_calls = msg.get("tool_calls") or []
+
+    normalized = []
+    for tc in raw_calls:
+        fn = tc.get("function") or {}
+        args = fn.get("arguments")
+        if isinstance(args, str):
+            args = _parse_args(args)
+        elif not isinstance(args, dict):
+            args = {}
+        normalized.append({
+            "id": tc.get("id"),
+            "name": fn.get("name", ""),
+            "arguments": args,
+            "_raw": tc,
+        })
+
+    return {
+        "content": (msg.get("content") or "").strip(),
+        "tool_calls": normalized,
+        "raw": data,
+    }
+
+
+def _parse_args(raw) -> dict:
+    """Tool arguments can arrive as a dict, a JSON string, or nothing."""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
 
 
 def append_tool_exchange(messages: list[dict],
                          tool_call: dict,
                          result_text: str) -> list[dict]:
     """
-    Return a new message list with the assistant's tool_call and the tool
-    result appended, in the shape Ollama expects for the follow-up call.
-
-    Ollama requires the assistant message to echo the tool_call, followed
-    by a role:"tool" message carrying the result under the matching
-    tool_name.
+    Append the assistant's tool call + the tool result to the message
+    stream, in whichever shape the active backend expects.
     """
-    fn = tool_call.get("function") or {}
-    name = fn.get("name", "")
+    backend = _chat_backend()
+
+    if backend == "bonsai":
+        raw = tool_call.get("_raw") or {
+            "id": tool_call.get("id") or "call_0",
+            "type": "function",
+            "function": {
+                "name": tool_call.get("name", ""),
+                "arguments": json.dumps(tool_call.get("arguments") or {}),
+            },
+        }
+        call_id = raw.get("id") or "call_0"
+        return [
+            *messages,
+            {"role": "assistant", "content": None, "tool_calls": [raw]},
+            {"role": "tool", "tool_call_id": call_id, "content": result_text},
+        ]
+
+    # Ollama
+    raw = tool_call.get("_raw") or {
+        "function": {
+            "name": tool_call.get("name", ""),
+            "arguments": tool_call.get("arguments") or {},
+        },
+    }
+    name = (raw.get("function") or {}).get("name", "")
     return [
         *messages,
-        {"role": "assistant", "content": "", "tool_calls": [tool_call]},
+        {"role": "assistant", "content": "", "tool_calls": [raw]},
         {"role": "tool", "tool_name": name, "content": result_text},
     ]
 def chat_streaming(messages: list[dict],

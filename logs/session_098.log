@@ -1,0 +1,44 @@
+[15:45:47.084] SESSION started
+[15:45:47.085] SESSION: 98 started → session_098.log
+[15:45:47.116] GPU monitor: pynvml
+[15:45:52.121] GPU: vram=7750/8192MB util=0%
+[15:45:53.036] ────: ────────────────────────────────────────────────────────────
+[15:45:53.036] USER: i like green tea
+[15:45:53.710] ROUTE: → chat (673ms, conf=1.00, candidates=['chat'])
+[15:45:53.710] ROUTE: chat: user='i like green tea' router_msg='Green tea'
+[15:45:53.712] MEMORY: 0 records
+[15:45:53.712] LLM: start: backend=bonsai model=bonsai
+[15:45:54.035] LLM: first token at 323ms
+[15:45:54.408] LLM: 14 tokens in 695ms (20.14 tok/s)
+[15:45:54.408] ASSISTANT: Noted. I'll ensure a pot is always prepared, sir.
+[15:45:54.408] TURN TOTAL: 697ms
+[15:45:57.129] GPU: vram=7737/8192MB util=0%
+[15:45:59.855] ────: ────────────────────────────────────────────────────────────
+[15:45:59.855] USER: i prefer sunnny weather to rain
+[15:45:59.972] ROUTE: → chat (117ms, conf=1.00)
+[15:45:59.972] ROUTE: chat: user='i prefer sunnny weather to rain' router_msg='i prefer sunnny weather to rain'
+[15:45:59.972] MEMORY: 0 records
+[15:45:59.972] LLM: start: backend=bonsai model=bonsai
+[15:46:00.283] LLM: first token at 311ms
+[15:46:00.591] LLM: 12 tokens in 618ms (19.41 tok/s)
+[15:46:00.591] ASSISTANT: Understood. I shall keep you informed of the forecast.
+[15:46:00.591] TURN TOTAL: 619ms
+[15:46:02.133] GPU: vram=7729/8192MB util=0%
+[15:46:07.134] GPU: vram=7729/8192MB util=0%
+[15:46:09.353] ────: ────────────────────────────────────────────────────────────
+[15:46:09.353] USER: i hate thunderstorms
+[15:46:09.852] ROUTE: → chat (498ms, conf=1.00, candidates=['chat'])
+[15:46:09.852] ROUTE: chat: user='i hate thunderstorms' router_msg='Thunderstorms'
+[15:46:09.852] MEMORY: 0 records
+[15:46:09.852] LLM: start: backend=bonsai model=bonsai
+[15:46:10.180] LLM: first token at 326ms
+[15:46:10.481] LLM: 12 tokens in 627ms (19.13 tok/s)
+[15:46:10.482] ASSISTANT: Noted. I shall keep you informed of the forecast.
+[15:46:10.482] TURN TOTAL: 630ms
+[15:46:12.143] GPU: vram=7747/8192MB util=1%
+[15:46:17.155] GPU: vram=7747/8192MB util=0%
+[15:46:22.171] GPU: vram=7747/8192MB util=0%
+[15:46:27.173] GPU: vram=7744/8192MB util=1%
+[15:46:32.188] GPU: vram=7741/8192MB util=0%
+[15:46:35.799] WORKER: stop requested; finishing current batch
+[15:46:36.113] SESSION ended

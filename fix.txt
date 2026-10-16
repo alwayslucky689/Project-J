@@ -7,3 +7,4 @@ add hardstop with text
 add 1 fake prompt that doesnt get saved to warm up llm each run
 bonsai in chat mode talks too much with points etc make it more natural
 jarvis lost his personality since bonsai give it back
+add gitingest and download to tool path so i can quickly get it

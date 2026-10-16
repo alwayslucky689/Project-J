@@ -1,0 +1,54 @@
+[16:17:57.169] SESSION started
+[16:17:57.168] WORKER: loop entered
+[16:17:57.168] WORKER: should_run=True
+[16:17:57.168] WORKER: >>> RUN_BATCH ENTERED <<<
+[16:17:57.168] WORKER: >>> got 8 turns <<<
+[16:17:57.168] WORKER: batch: 8 pending turns
+[16:17:57.169] SESSION: 104 started → session_104.log
+[16:17:57.190] GPU monitor: pynvml
+[16:17:58.749] WORKER: extract: 3 candidates
+[16:17:58.750] WORKER: validate: 3/3 kept
+[16:17:58.751] RESOLVE: start: user/love = 'zelda' scope=unscoped/None correction=False single=False
+[16:17:58.751] RESOLVE: -> skipped (duplicate of #63 status=active)
+[16:17:58.751] RESOLVE: start: user/prefer = 'cats' scope=unscoped/None correction=False single=False
+[16:17:58.751] RESOLVE: -> skipped (duplicate of #64 status=active)
+[16:17:58.751] RESOLVE: start: user/like = 'evenings' scope=unscoped/None correction=False single=False
+[16:17:58.751] RESOLVE: -> skipped (duplicate of #65 status=active)
+[16:17:58.751] WORKER: resolved: {'skipped': 3}
+[16:18:02.194] GPU: vram=7720/8192MB util=23%
+[16:18:07.201] GPU: vram=7720/8192MB util=1%
+[16:18:08.389] ────: ────────────────────────────────────────────────────────────
+[16:18:08.389] USER: how are you
+[16:18:08.993] ROUTE: → chat (602ms, conf=1.00, candidates=['chat'])
+[16:18:08.993] ROUTE: chat: user='how are you' router_msg='How are you'
+[16:18:08.996] MEMORY: 0 records
+[16:18:08.996] LLM: start: backend=bonsai model=bonsai
+[16:18:09.799] LLM: first token at 803ms
+[16:18:10.038] LLM: 9 tokens in 1042ms (8.63 tok/s)
+[16:18:10.038] ASSISTANT: Operational, sir. All systems nominal.
+[16:18:10.038] TURN TOTAL: 1044ms
+[16:18:12.226] GPU: vram=7733/8192MB util=0%
+[16:18:16.612] ────: ────────────────────────────────────────────────────────────
+[16:18:16.612] USER: i like pepperoni pizza
+[16:18:16.770] ROUTE: → chat (159ms, conf=1.00)
+[16:18:16.770] ROUTE: chat: user='i like pepperoni pizza' router_msg='i like pepperoni pizza'
+[16:18:16.770] MEMORY: 0 records
+[16:18:16.770] LLM: start: backend=bonsai model=bonsai
+[16:18:17.063] LLM: first token at 292ms
+[16:18:17.235] GPU: vram=7710/8192MB util=4%
+[16:18:17.453] LLM: 15 tokens in 683ms (21.97 tok/s)
+[16:18:17.454] ASSISTANT: A fine choice, sir. I'll add it to the preferences file.
+[16:18:17.454] TURN TOTAL: 683ms
+[16:18:18.834] WORKER: should_run=True
+[16:18:18.834] WORKER: >>> RUN_BATCH ENTERED <<<
+[16:18:18.834] WORKER: >>> got 4 turns <<<
+[16:18:18.834] WORKER: batch: 4 pending turns
+[16:18:18.838] WORKER: extract: 1 candidates
+[16:18:18.838] WORKER: validate: 1/1 kept
+[16:18:18.838] RESOLVE: start: user/like = 'pepperoni pizza' scope=unscoped/None correction=False single=False
+[16:18:18.838] RESOLVE: -> inserted (active)
+[16:18:19.409] WORKER: resolved: {'inserted': 1}
+[16:18:22.245] GPU: vram=7710/8192MB util=0%
+[16:18:27.249] GPU: vram=7710/8192MB util=0%
+[16:18:27.711] WORKER: stop requested; finishing current batch
+[16:18:28.330] SESSION ended
