@@ -1,0 +1,41 @@
+[13:51:23.889] SESSION started
+[13:51:23.888] WORKER: loop entered
+[13:51:23.889] SESSION: 107 started → session_107.log
+[13:51:23.919] GPU monitor: pynvml
+[13:51:24.864] SESSION ended
+[13:51:43.136] SESSION started
+[13:51:43.135] WORKER: loop entered
+[13:51:43.136] SESSION: 107 started → session_107.log
+[13:51:43.155] GPU monitor: pynvml
+[13:51:47.695] ────: ────────────────────────────────────────────────────────────
+[13:51:47.695] USER: i like green tea
+[13:51:48.190] GPU: vram=7750/8192MB util=26%
+[13:51:48.268] ROUTE: → chat (571ms, conf=0.98, candidates=['chat'])
+[13:51:48.268] ROUTE: chat: user='i like green tea' router_msg='Green tea'
+[13:51:48.272] MEMORY: 0 records
+[13:51:48.272] LLM: start: backend=bonsai model=bonsai
+[13:51:49.161] LLM: first token at 889ms
+[13:51:49.598] LLM: 16 tokens in 1326ms (12.06 tok/s)
+[13:51:49.599] ASSISTANT: Noted, sir. I shall ensure a pot is always at the ready.
+[13:51:49.599] TURN TOTAL: 1328ms
+[13:51:49.618] RESOLVE: start: user/like = 'green tea' scope=unscoped/None correction=False single=False
+[13:51:49.618] RESOLVE: -> skipped (duplicate of #51 status=active)
+[13:51:49.618] EXTRACT: turn 560: skipped | The user likes green tea.
+[13:51:49.618] EXTRACT: inline hook: 20ms
+[13:51:51.173] WORKER: should_run=True
+[13:51:51.173] WORKER: >>> RUN_BATCH ENTERED <<<
+[13:51:51.173] WORKER: >>> got 4 turns <<<
+[13:51:51.173] WORKER: batch: 4 pending turns
+[13:51:51.181] WORKER: extract: 2 candidates
+[13:51:51.181] WORKER: validate: 2/2 kept
+[13:51:51.181] RESOLVE: start: user/like = 'red tea' scope=unscoped/None correction=False single=False
+[13:51:51.181] RESOLVE: -> inserted (active)
+[13:51:52.320] RESOLVE: start: user/like = 'green tea' scope=unscoped/None correction=False single=False
+[13:51:52.321] RESOLVE: -> skipped (duplicate of #51 status=active)
+[13:51:52.321] WORKER: resolved: {'inserted': 1, 'skipped': 1}
+[13:51:53.198] GPU: vram=7768/8192MB util=0%
+[13:51:58.200] GPU: vram=7767/8192MB util=0%
+[13:52:03.202] GPU: vram=7767/8192MB util=0%
+[13:52:08.215] GPU: vram=7767/8192MB util=0%
+[13:52:09.059] WORKER: stop requested; finishing current batch
+[13:52:09.682] SESSION ended

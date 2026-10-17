@@ -39,6 +39,8 @@ from core.cancel import (
     start_listener as start_cancel_listener,
     stop_listener as stop_cancel_listener,
 )
+from memory.worker import try_inline_extract
+from memory.sessions import get_current_session_id
 # Explicit "save this fact" phrasing. Matches only when a save verb is
 # followed by a clause-introducer ("that", "this", "to", "I", ...).
 # Bare "remember X" is ambiguous ("remember the pizza thing" could be
@@ -61,11 +63,6 @@ _TOOL_PATH_HINT = (
     "elaborate until you have checked memory first."
 )
 def _try_explicit_save(query: str):
-    """
-    Short-circuit explicit save phrases straight to remember_fact.
-    Needle is unreliable when the candidate set is two tools; don't
-    route an unambiguous save through it.
-    """
     m = _EXPLICIT_SAVE.match(query)
     if not m:
         return None
@@ -73,7 +70,7 @@ def _try_explicit_save(query: str):
     if not fact:
         return None
     result = execute_single_action({"tool": "remember_fact", "fact": fact})
-    return AssistantResponse(text=result, was_streamed=False)
+    return AssistantResponse(text=result, was_streamed=False, skip_inline=True)
 
 def _build_chat_system_prompt(query: str) -> str:
     """
@@ -203,6 +200,7 @@ class AssistantResponse:
     was_streamed: bool = False
     speak: bool = True
     was_spoken: bool = False
+    skip_inline: bool = False
 
 
 import re as _re
@@ -589,17 +587,20 @@ def on_transcription(text):
     print(f"\n  Processing: {text}")
 
     if text.strip().lower().rstrip(".!?") in _EXIT_PHRASES:
-        print("👋 Goodbye!")
-        if settings.ENABLE_TTS:
-            _speak_safe("Goodbye, Sir.")
-        import os
-        os._exit(0)
+        ...
 
     if audio_pipeline:
         audio_pipeline.set_speaking(True)
     try:
         response = route_request(text)
         handle_response(response)
+
+        if not getattr(response, "skip_inline", False):
+            from memory.worker import try_inline_extract
+            import memory.sessions as _sessions
+            sid_now = _sessions.get_current_session_id()
+            if sid_now is not None:
+                try_inline_extract(text, sid_now)
     finally:
         if audio_pipeline:
             audio_pipeline.set_speaking(False)
@@ -844,6 +845,13 @@ def main():
     if loaded:
         print(f"📖 Resumed session {sid} with {loaded} recent turns.")
     start_worker()
+    def _warm_spacy():
+        try:
+            from memory.extract import _get_spacy
+            _get_spacy()
+        except Exception:
+            pass
+    threading.Thread(target=_warm_spacy, daemon=True).start()
     dbg.init(session_id=sid, debug=getattr(args, "debug", False))
     if (getattr(settings, "CHAT_BACKEND", "ollama") == "bonsai"
             and getattr(settings, "BONSAI_AUTOSTART", True)):
@@ -920,6 +928,19 @@ def main():
         try:
             response = route_request(user_input)
             handle_response(response)
+
+            # 7d: inline extraction — fact available by the next turn.
+            # Runs AFTER handle_response returns, which blocks on TTS.
+            if not getattr(response, "skip_inline", False):
+                import memory.sessions as _sessions
+                sid_now = _sessions.get_current_session_id()
+                if sid_now is not None:
+                    t_inline = time.perf_counter()
+                    ran = try_inline_extract(user_input, sid_now)
+                    if ran:
+                        dbg.event("EXTRACT",
+                                  f"inline hook: "
+                                  f"{(time.perf_counter()-t_inline)*1000:.0f}ms")
         except Exception as e:
             print(f"❌ Error: {e}")
 

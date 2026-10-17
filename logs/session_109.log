@@ -1,0 +1,34 @@
+[13:53:35.884] SESSION started
+[13:53:35.882] WORKER: loop entered
+[13:53:35.884] SESSION: 109 started → session_109.log
+[13:53:35.905] GPU monitor: pynvml
+[13:53:40.909] GPU: vram=7765/8192MB util=17%
+[13:53:41.366] ────: ────────────────────────────────────────────────────────────
+[13:53:41.366] USER: i love ham
+[13:53:42.195] ROUTE: → chat (827ms, conf=1.00, candidates=['chat'])
+[13:53:42.195] ROUTE: chat: user='i love ham' router_msg='Ham'
+[13:53:42.199] MEMORY: 0 records
+[13:53:42.199] LLM: start: backend=bonsai model=bonsai
+[13:53:43.020] LLM: first token at 821ms
+[13:53:43.194] LLM: 6 tokens in 996ms (6.03 tok/s)
+[13:53:43.195] ASSISTANT: A fine preference, sir.
+[13:53:43.195] TURN TOTAL: 997ms
+[13:53:43.203] RESOLVE: start: user/love = 'ham' scope=unscoped/None correction=False single=False
+[13:53:43.203] RESOLVE: -> inserted (active)
+[13:53:43.827] EXTRACT: turn 564: inserted | The user loves ham.
+[13:53:43.827] EXTRACT: inline hook: 632ms
+[13:53:45.082] WORKER: should_run=True
+[13:53:45.082] WORKER: >>> RUN_BATCH ENTERED <<<
+[13:53:45.082] WORKER: >>> got 4 turns <<<
+[13:53:45.082] WORKER: batch: 4 pending turns
+[13:53:45.916] GPU: vram=7780/8192MB util=63%
+[13:53:47.312] WORKER: extract: 2 candidates
+[13:53:47.312] WORKER: validate: 2/2 kept
+[13:53:47.312] RESOLVE: start: user/prefers = 'blue tea' scope=global/None correction=False single=False
+[13:53:47.312] RESOLVE: -> inserted (active)
+[13:53:47.317] RESOLVE: start: user/love = 'ham' scope=unscoped/None correction=False single=False
+[13:53:47.317] RESOLVE: -> skipped (duplicate of #68 status=active)
+[13:53:47.317] WORKER: resolved: {'inserted': 1, 'skipped': 1}
+[13:53:50.927] GPU: vram=7772/8192MB util=0%
+[13:53:52.960] WORKER: stop requested; finishing current batch
+[13:53:53.582] SESSION ended

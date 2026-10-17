@@ -1,0 +1,19 @@
+[13:49:40.673] SESSION started
+[13:49:40.672] WORKER: loop entered
+[13:49:40.673] SESSION: 106 started → session_106.log
+[13:49:40.697] GPU monitor: pynvml
+[13:49:45.701] GPU: vram=7753/8192MB util=25%
+[13:49:46.273] ────: ────────────────────────────────────────────────────────────
+[13:49:46.273] USER: i like red tea
+[13:49:46.810] ROUTE: → chat (536ms, conf=0.99, candidates=['chat'])
+[13:49:46.810] ROUTE: chat: user='i like red tea' router_msg='Red tea'
+[13:49:46.812] MEMORY: 0 records
+[13:49:46.812] LLM: start: backend=bonsai model=bonsai
+[13:49:47.606] LLM: first token at 794ms
+[13:49:47.879] LLM: 10 tokens in 1067ms (9.37 tok/s)
+[13:49:47.880] ASSISTANT: Noted, sir. The kettle is on.
+[13:49:47.880] TURN TOTAL: 1069ms
+[13:49:50.715] GPU: vram=7766/8192MB util=0%
+[13:49:55.724] GPU: vram=7770/8192MB util=1%
+[13:49:56.516] WORKER: stop requested; finishing current batch
+[13:49:57.130] SESSION ended

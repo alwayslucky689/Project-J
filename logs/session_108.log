@@ -1,0 +1,20 @@
+[13:52:38.008] SESSION started
+[13:52:38.007] WORKER: loop entered
+[13:52:38.008] SESSION: 108 started → session_108.log
+[13:52:38.039] GPU monitor: pynvml
+[13:52:43.054] GPU: vram=7746/8192MB util=20%
+[13:52:44.414] ────: ────────────────────────────────────────────────────────────
+[13:52:44.414] USER: ii like blue tea
+[13:52:44.970] ROUTE: → chat (554ms, conf=1.00)
+[13:52:44.970] ROUTE: chat: user='ii like blue tea' router_msg='ii like blue tea'
+[13:52:44.973] MEMORY: 0 records
+[13:52:44.973] LLM: start: backend=bonsai model=bonsai
+[13:52:45.763] LLM: first token at 790ms
+[13:52:46.914] LLM: 46 tokens in 1940ms (23.71 tok/s)
+[13:52:46.914] ASSISTANT: I'm afraid that might be a little unconventional, sir. I've noted the preference in your records. If you'd like a genuine blue hue, I can brew a cup of butterfly pea flower tea, which is entirely natural.
+[13:52:46.914] TURN TOTAL: 1942ms
+[13:52:46.922] EXTRACT: turn 562: no spaCy candidates (LLM fallback left to worker)
+[13:52:46.922] EXTRACT: inline hook: 8ms
+[13:52:47.655] WORKER: stop requested; finishing current batch
+[13:52:48.059] GPU: vram=973/8192MB util=19%
+[13:52:48.366] SESSION ended

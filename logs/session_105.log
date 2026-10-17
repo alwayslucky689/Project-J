@@ -1,0 +1,51 @@
+[13:18:31.944] SESSION started
+[13:18:31.943] WORKER: loop entered
+[13:18:31.945] SESSION: 105 started → session_105.log
+[13:18:31.978] GPU monitor: pynvml
+[13:18:36.990] GPU: vram=1018/8192MB util=0%
+[13:18:41.995] GPU: vram=1014/8192MB util=0%
+[13:18:42.612] SESSION ended
+[13:19:58.762] SESSION started
+[13:19:58.761] WORKER: loop entered
+[13:19:58.762] SESSION: 105 started → session_105.log
+[13:19:58.782] GPU monitor: pynvml
+[13:20:03.792] GPU: vram=7736/8192MB util=3%
+[13:20:06.489] ────: ────────────────────────────────────────────────────────────
+[13:20:06.490] USER: hey how are you
+[13:20:07.141] ROUTE: → chat (650ms, conf=1.00, candidates=['chat'])
+[13:20:07.141] ROUTE: chat: user='hey how are you' router_msg='How are you'
+[13:20:07.144] MEMORY: 0 records
+[13:20:07.144] LLM: start: backend=bonsai model=bonsai
+[13:20:08.072] LLM: first token at 927ms
+[13:20:08.311] LLM: 8 tokens in 1167ms (6.86 tok/s)
+[13:20:08.312] ASSISTANT: All operational, sir. And you?
+[13:20:08.312] TURN TOTAL: 1169ms
+[13:20:08.800] GPU: vram=7729/8192MB util=57%
+[13:20:13.805] GPU: vram=7729/8192MB util=1%
+[13:20:16.180] ────: ────────────────────────────────────────────────────────────
+[13:20:16.180] USER: hey faye what do  you think about jarvis
+[13:20:16.924] ROUTE: → chat (744ms, conf=1.00, candidates=['chat', 'change_personality'])
+[13:20:16.924] ROUTE: chat: user='what do  you think about jarvis' router_msg='You think about jarvis'
+[13:20:16.924] MEMORY: 0 records
+[13:20:16.924] LLM: start: backend=bonsai model=bonsai
+[13:20:18.819] GPU: vram=7748/8192MB util=85%
+[13:20:18.824] LLM: first token at 1899ms
+[13:20:20.388] LLM: 64 tokens in 3464ms (18.48 tok/s)
+[13:20:20.388] ASSISTANT: Oh, you're bringing up the butler?
+[13:20:20.388]   
+[13:20:20.388]   I think he's a pain in the neck who never takes his eyes off the monitor and probably judges your shoe choices while you're trying to sleep.
+[13:20:20.388]   
+[13:20:20.388]   He's useful, I'll give him that. But he's also a walking migraine with a British accent.
+[13:20:20.388] TURN TOTAL: 3464ms
+[13:20:20.894] WORKER: should_run=True
+[13:20:20.894] WORKER: >>> RUN_BATCH ENTERED <<<
+[13:20:20.894] WORKER: >>> got 4 turns <<<
+[13:20:20.894] WORKER: batch: 4 pending turns
+[13:20:20.895] WORKER: extract: 0 candidates
+[13:20:20.895] WORKER: validate: 0/0 kept
+[13:20:20.895] WORKER: resolved: no actions
+[13:20:23.829] GPU: vram=7741/8192MB util=0%
+[13:20:28.845] GPU: vram=7741/8192MB util=0%
+[13:20:28.922] WORKER: idle: checkpoint=557 pending=0
+[13:20:30.955] WORKER: stop requested; finishing current batch
+[13:20:31.268] SESSION ended

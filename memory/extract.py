@@ -140,7 +140,7 @@ def _canonical_property(prop: str) -> str:
 
 # ===== Public API =====
 
-def extract_candidates(turns: list[dict]) -> list[dict]:
+def extract_candidates(turns: list[dict], spacy_only: bool = False) -> list[dict]:
     user_turns = [t for t in turns if t["role"] == "user"]
     candidates: list[dict] = []
 
@@ -165,6 +165,11 @@ def extract_candidates(turns: list[dict]) -> list[dict]:
                     text, has_active_topic,
                 )
             candidates.extend(spacy_results)
+            continue
+
+        # 7d: inline path skips the LLM fallback to keep latency near zero.
+        # The worker still runs it later for these turns.
+        if spacy_only:
             continue
 
         # Stage 3: LLM fallback

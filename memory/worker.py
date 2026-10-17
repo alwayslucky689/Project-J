@@ -225,6 +225,78 @@ def get_worker() -> _Worker:
                 _worker = _Worker()
     return _worker
 
+def try_inline_extract(user_input: str, session_id: int) -> bool:
+    """
+    Synchronous single-turn extraction. Runs after the assistant has
+    responded and TTS has finished, before the next input() prompt.
+
+    Uses ONLY the spaCy path — no LLM call — to keep latency near zero
+    (~50ms on hits, 0ms on prefilter misses). Facts needing the LLM
+    fallback are left for the worker to pick up in its next batch.
+
+    The checkpoint is NOT advanced here. The worker re-processes the
+    turn later; resolve_candidate dedups via the exact-duplicate check.
+
+    Returns True if extraction ran (whether or not anything was saved),
+    False if the prefilter rejected the turn (no work needed).
+    """
+    from memory.extract import _looks_memory_worthy, extract_candidates
+    from memory.validate import validate_candidate
+    from memory.resolve import resolve_candidate
+    from memory.store import get_conn
+
+    if not user_input or not _looks_memory_worthy(user_input):
+        return False
+
+    conn = get_conn()
+
+    # Most recent user turn — the one we just persisted
+    turn_row = conn.execute(
+        "SELECT id FROM turns WHERE session_id = ? AND role='user' "
+        "ORDER BY id DESC LIMIT 1",
+        (session_id,)
+    ).fetchone()
+    if not turn_row:
+        return False
+
+    sess_row = conn.execute(
+        "SELECT context FROM sessions WHERE id = ?", (session_id,)
+    ).fetchone()
+    context = sess_row["context"] if sess_row else "global"
+
+    synthetic = {
+        "id": turn_row["id"],
+        "role": "user",
+        "text": user_input,
+        "context": context,
+    }
+
+    try:
+        candidates = extract_candidates([synthetic], spacy_only=True)
+    except Exception as e:
+        dbg.event("EXTRACT", f"turn {turn_row['id']} extract error: {e}")
+        return False
+
+    if not candidates:
+        dbg.event("EXTRACT", f"turn {turn_row['id']}: no spaCy candidates "
+                             f"(LLM fallback left to worker)")
+        return True
+
+    for c in candidates:
+        ok, revised, reason = validate_candidate(c)
+        if not ok:
+            dbg.event("EXTRACT", f"turn {turn_row['id']} rejected: {reason} | "
+                                 f"{c.get('text', '?')[:60]}")
+            continue
+        try:
+            action = resolve_candidate(revised)
+        except Exception as e:
+            dbg.event("EXTRACT", f"turn {turn_row['id']} resolve error: {e}")
+            continue
+        dbg.event("EXTRACT", f"turn {turn_row['id']}: {action} | "
+                             f"{revised.get('text', '?')[:80]}")
+
+    return True
 
 def start_worker():
     get_worker().start()
